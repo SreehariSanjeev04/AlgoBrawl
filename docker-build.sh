@@ -1,0 +1,1 @@
+docker build -t code-runner-cpp backend/executor/cpp && docker build -t code-runner-python backend/executor/python

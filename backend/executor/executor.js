@@ -29,6 +29,50 @@ router.post("/run", async (req, res) => {
       .status(429)
       .json({ output: "Too many submissions. Please try again shortly." });
   }
+  const { language, code, testcases } = req.body;
+  const config = LANGUAGE_CONFIG[language];
+  if (!config) {
+    return res.status(400).json({ error: "Unsupported language" });
+  }
+
+  const timestamp = Date.now();
+  const filename = `${timestamp}_${config.file}`;
+  const filepath = path.join(__dirname, "temp", filename);
+
+  const inputfile = `testcases_${timestamp}.txt`;
+  const inputpath = path.join(__dirname, "temp", inputfile);
+
+  containers++;
+  try {
+    fs.writeFileSync(filepath, code);
+    fs.writeFileSync(inputpath, testcases)
+
+    const command = `timeout 5 docker run --rm --memory=100m --cpus=0.5 -v ${filepath}:/code/${config.file} -v ${inputpath}:/code/input.txt ${config.image}`;
+    exec(command, (err, stdout, stderr) => {
+      containers--;
+      [inputpath, filepath].forEach((f) => {
+        if (fs.existsSync(f)) fs.unlinkSync(f);
+      });
+      if (err) {
+        return res.status(400).json({ output: stderr || "Execution error." });
+      }
+      return res.status(200).json({ output: stdout });
+    });
+  } catch (err) {
+    containers--;
+    [inputpath, filepath].forEach((f) => {
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+    });
+    console.log(err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+router.post("/submit", async (req, res) => {
+  if (containers >= MAX_CONTAINERS) {
+    return res
+      .status(429)
+      .json({ output: "Too many submissions. Please try again shortly." });
+  }
 
   const { language, code, testcases, expected } = req.body;
   const config = LANGUAGE_CONFIG[language];
