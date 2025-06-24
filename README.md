@@ -44,19 +44,24 @@ cd AlgoBrawl
 ## Folder Structure
 
 AlgoBrawl/
-│
 ├── backend/
-│   ├── models/
-│   ├── routes/
-│   ├── executor/       # Docker-based code runner
-│   └── database/
+│   ├── models/           # Sequelize models
+│   ├── routes/           # API routes
+│   ├── executor/         # Docker-based code runner
+│   └── database/         # DB config & migrations
 │
 ├── frontend/
-│   ├── pages/
-│   ├── components/
-│   └── styles/
+│   ├── pages/            # Next.js or React pages
+│   ├── components/       # Reusable UI components
+│   └── styles/           # Tailwind/global styles
 │
 └── docker/
-    ├── python/
-    └── cpp/
+    ├── python/           # Docker image for Python execution
+    └── cpp/              # Docker image for C++ execution
 
+### Note
+You must build docker images to run the containers for code execution, dont worry, docker-build.sh will take care of it!
+```bash
+chmod +x docker-build.sh
+./docker-build.sh
+```
