@@ -1,16 +1,21 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Editor } from "@monaco-editor/react";
 import { LANGUAGE_VERSIONS } from "../lang_constants";
+import { toast } from "sonner";
 
-const CodeEditor = () => {
+const CodeEditor = ({ problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
   const editorRef = useRef(null);
   const [value, setValue] = useState("");
   const [language, setLanguage] = useState("javascript");
   const [outputValue, setOutputValue] = useState("// Output will appear here");
   const [outputError, setOutputError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [testcase, setTestcase] = useState("");
+  const [expected, setExpected] = useState("");
+  const [input, setInput] = useState("");
 
   const currentLanguages = Object.entries(LANGUAGE_VERSIONS);
 
@@ -19,108 +24,179 @@ const CodeEditor = () => {
     editor.focus();
   };
 
-  /*{
-  "id": 2,
-  "title": "Sum of Digits",
-  "description": "Given a non-negative integer n, return the sum of its digits.",
-  "testcases": [
-    {
-      "input": "123",
-      "expected": "6"
-    },
-    {
-      "input": "0",
-      "expected": "0"
-    },
-    {
-      "input": "9999",
-      "expected": "36"
+  useEffect(() => {
+    if (problem?.testcases.length) {
+      const inputStr = problem.testcases.map((t) => t.input).join("\n");
+      const expectedStr = problem.testcases.map((t) => t.expected).join("\n");
+      setInput(inputStr);
+      setExpected(expectedStr);
     }
-  ],
-  "difficulty": "Easy",
-  "createdAt": "2025-06-23T12:21:13.021Z",
-  "updatedAt": "2025-06-23T12:21:13.021Z"
-} */
+  }, [problem]);
 
   const submitCode = async () => {
-    const blob = await fetch(`${BACKEND_URI}/run`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        language,
-        code: value,
-      }),
-    });
-    const response = await blob.json();
-    setOutputError(!blob.ok);
-    setOutputValue(response);
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URI}/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          language,
+          code: value,
+          testcases: input,
+          expected,
+        }),
+      });
+      console.log(language);
+      console.log(value);
+      console.log(input);
+      console.log(expected);
+      const data = await res.json();
+      console.log(data);
+      setOutputError(!res.ok);
+      setOutputValue(data.output || data.error || "No output");
+    } catch (err) {
+      console.log(err);
+      setOutputError(err.message || "Could not connect to backend");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const runCode = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URI}/run`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          language,
+          code: value,
+          testcases: testcase,
+        }),
+      });
+
+      const data = await res.json();
+      console.log(data);
+      setOutputError(!res.ok);
+      setOutputValue(data.output || data.error || "No output");
+    } catch {
+      setOutputError(true);
+      setOutputValue("Error connecting to backend.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="h-screen w-full bg-gray-900 text-white flex flex-col">
-      <div className="p-4 flex items-center gap-4 font-semibold">
-        <label htmlFor="language" className="text-sm text-gray-300">
-          Language:
-        </label>
-        <select
-          id="language"
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className="bg-gray-800 border text-gray-300 border-gray-600 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {currentLanguages.map(([lang]) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
+      <div className="p-4 flex flex-wrap items-center gap-4 font-semibold bg-gray-800 shadow">
+        <div className="flex items-center gap-2">
+          <label htmlFor="language" className="text-sm text-gray-300">
+            Language:
+          </label>
+          <select
+            id="language"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 text-sm focus:ring focus:ring-blue-500"
+          >
+            {currentLanguages.map(([lang]) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
-          className="inline-block bg-gradient-to-r from-green-500 to-teal-500 px-3 py-2 rounded-xl font-semibold text-black hover:opacity-90 transition-all duration-200"
-          onClick={submitCode}
+          onClick={runCode}
+          disabled={loading}
+          className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
+            loading ? "opacity-60 cursor-not-allowed" : ""
+          }`}
         >
-          Submit
+          {loading ? "Running..." : "Run"}
+        </button>
+        <button
+          onClick={submitCode}
+          disabled={loading}
+          className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
+            loading ? "opacity-60 cursor-not-allowed" : ""
+          }`}
+        >
+          {loading ? "Running..." : "Submit"}
         </button>
       </div>
 
-      <div className="flex-1 grid grid-cols-12 gap-2 p-2">
-        <div className="col-span-12 md:col-span-3 bg-gray-800 p-4 rounded-lg overflow-auto">
-          <h2 className="text-lg font-semibold mb-2">Problem Description</h2>
-          <p className="text-sm text-gray-400">
-            // Describe the problem or input here
+      <div className="flex-1 grid grid-cols-12 gap-4 p-4">
+        <div className="col-span-12 md:col-span-3 bg-gray-800 p-4 rounded-xl overflow-auto">
+          <h2 className="text-xl font-bold mb-2">
+            {problem?.title || "Problem Title"}
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            {problem?.description || "// Describe the problem here"}
           </p>
+
+          <div className="mt-6 bg-gray-700 p-3 rounded-xl">
+            <h3 className="text-md font-semibold mb-2 text-white">Testcases</h3>
+            {problem?.testcases?.length ? (
+              problem.testcases.slice(0, 3).map((testcase, idx) => (
+                <div
+                  key={idx}
+                  className="mb-3 p-2 border border-gray-600 rounded bg-gray-800 text-sm text-gray-300"
+                >
+                  <p>
+                    <span className="text-gray-400">Input:</span>{" "}
+                    {testcase.input}
+                  </p>
+                  <p>
+                    <span className="text-gray-400">Expected:</span>{" "}
+                    {testcase.expected}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-400">// Testcases will appear here</p>
+            )}
+          </div>
         </div>
 
-        <div className="col-span-12 md:col-span-6 bg-gray-800 rounded-lg overflow-hidden">
+        <div className="col-span-12 md:col-span-6 bg-gray-800 rounded-xl overflow-hidden">
           <Editor
             theme="vs-dark"
             height="100%"
             language={language}
-            defaultValue="// some comment"
+            defaultValue="// Write your code here"
             value={value}
             onChange={(val) => setValue(val || "")}
             onMount={onMount}
           />
         </div>
 
-        <div className="col-span-12 md:col-span-3">
-          <div className="bg-gray-800 h-1/2 p-4 rounded-lg overflow-auto">
+        <div className="col-span-12 md:col-span-3 flex flex-col gap-2">
+          <div className="bg-gray-800 p-4 rounded-xl h-1/2 overflow-auto">
             <h2 className="text-lg font-semibold mb-2">Output</h2>
-            <p
-              className={`text-sm ${
-                outputError ? "text-red-500" : "text-gray-400"
+            <pre
+              className={`text-sm whitespace-pre-wrap ${
+                outputError ? "text-red-500" : "text-green-400"
               }`}
             >
-              {outputValue.output}
-            </p>
+              {outputValue}
+            </pre>
           </div>
-          <div className="h-1/2 bg-gray-800 mt-2 p-4 rounded-lg overflow-auto">
-            <h2 className="text-lg font-semibold mb-2">Testcase</h2>
+
+          <div className="bg-gray-800 p-4 rounded-xl h-1/2">
+            <h2 className="text-lg font-semibold mb-2">Custom Testcase</h2>
             <textarea
-              className="h-full w-full bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              className="w-full h-64 bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
               placeholder="Enter test case input here..."
+              value={testcase}
+              onChange={(e) => setTestcase(e.target.value)}
+              name="test-input"
             />
           </div>
         </div>

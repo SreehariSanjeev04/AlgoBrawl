@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const crypto = require("crypto");
 dotenv.config();
 const app = express();
 const execRouter = require("./executor/executor");
@@ -8,7 +9,8 @@ const sequelize = require("./database/db");
 const userRouter = require("./routes/UserRoutes");
 const problemRouter = require("./routes/ProblemRoutes");
 const httpServer = require("http").createServer(app);
-const matchRouter = require("./routes/MatchRoutes")
+const matchRouter = require("./routes/MatchRoutes");
+const { Json } = require("sequelize/lib/utils");
 const io = require("socket.io")(httpServer, {
   cors: {
     origin: "http://localhost:3000",
@@ -27,7 +29,7 @@ app.use(
 app.use("/api", execRouter);
 app.use("/api/user", userRouter);
 app.use("/api/problem", problemRouter);
-app.use("/api/match", matchRouter)
+app.use("/api/match", matchRouter);
 
 const queue = [];
 const matches = new Map();
@@ -37,12 +39,10 @@ io.on("connection", (socket) => {
   socket.on("join-matchmaking", async (user) => {
     queue.push({ socketId: socket.id, ...user });
     console.log(queue);
-    console.log(queue.length);
     if (queue.length >= 2) {
       const player1 = queue.shift();
       const player2 = queue.shift();
-      const roomId = `match-${Date.now()}`;
-
+      const roomId = crypto.randomUUID();
       try {
         const response = await fetch(
           `http://localhost:5000/api/problem/generate?difficulty=${user.difficulty}`,
@@ -57,10 +57,26 @@ io.on("connection", (socket) => {
         );
 
         const problem = await response.json();
-        matches.set(roomId, {
-          players: [player1.username, player2.username],
-          submissions: [],
-        });
+        console.log("Problem: ", problem);
+        // sending request to create a match
+
+        const roomResponse = await fetch(
+          "http://localhost:5000/api/match/create-match",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              roomId,
+              players: [player1.id, player2.id],
+              problem,
+            }),
+          }
+        );
+
+        if (!roomResponse.ok) console.log("Room creation failed");
 
         // make sure that players have joined the room
         const player1Socket = io.sockets.sockets.get(player1.socketId);
@@ -72,7 +88,6 @@ io.on("connection", (socket) => {
           if (joined == 2) {
             io.to(roomId).emit("match-started", {
               roomId,
-              players: [player1.username, player2.username],
             });
           }
         };
@@ -104,7 +119,6 @@ io.on("connection", (socket) => {
     queue.splice(idx, 1);
   });
 });
-
 
 const PORT = process.env.PORT || 3000;
 const server = () => {

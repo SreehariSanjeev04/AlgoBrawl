@@ -21,12 +21,10 @@ export default function MatchWaitingPage() {
         difficulty: "Easy",
       });
     };
-    const onMatchStarted = () => {
+    const onMatchStarted = (matchId) => {
       toast.success("Match Started")
-      
-      // for notification
       setTimeout(() => {
-        router.replace("/match");
+        router.replace(`/match/${matchId}`);
       }, 2000)
     };
     socket.on("connect_error", (err) => {
@@ -40,7 +38,7 @@ export default function MatchWaitingPage() {
 
     socket.on("connect", onConnect);
 
-    socket.on("match-started", onMatchStarted);
+    socket.on("match-started", ({roomId}) => onMatchStarted(roomId));
 
     if (!socket.connected) {
       console.log("Calling socket.connect()");

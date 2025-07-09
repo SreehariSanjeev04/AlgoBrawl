@@ -4,6 +4,7 @@ const router = require('express').Router()
 router.post("/create-match", async (req, res) => {
   const { roomId, players, problem } = req.body;
 
+  console.log(req.body)
   if (!roomId || !players || !(players instanceof Array) || !problem) {
     return res.status(400).json({
       error: "Incomplete details to create a room",
