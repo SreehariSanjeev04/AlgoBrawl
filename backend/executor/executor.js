@@ -30,6 +30,7 @@ router.post("/run", async (req, res) => {
       .json({ output: "Too many submissions. Please try again shortly." });
   }
   const { language, code, testcases } = req.body;
+  console.log(req.body)
   const config = LANGUAGE_CONFIG[language];
   if (!config) {
     return res.status(400).json({ error: "Unsupported language" });

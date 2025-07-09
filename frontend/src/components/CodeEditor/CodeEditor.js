@@ -19,6 +19,29 @@ const CodeEditor = () => {
     editor.focus();
   };
 
+  /*{
+  "id": 2,
+  "title": "Sum of Digits",
+  "description": "Given a non-negative integer n, return the sum of its digits.",
+  "testcases": [
+    {
+      "input": "123",
+      "expected": "6"
+    },
+    {
+      "input": "0",
+      "expected": "0"
+    },
+    {
+      "input": "9999",
+      "expected": "36"
+    }
+  ],
+  "difficulty": "Easy",
+  "createdAt": "2025-06-23T12:21:13.021Z",
+  "updatedAt": "2025-06-23T12:21:13.021Z"
+} */
+
   const submitCode = async () => {
     const blob = await fetch(`${BACKEND_URI}/run`, {
       method: "POST",
@@ -32,7 +55,7 @@ const CodeEditor = () => {
       }),
     });
     const response = await blob.json();
-    setOutputError(!blob.ok)
+    setOutputError(!blob.ok);
     setOutputValue(response);
   };
 
@@ -82,9 +105,24 @@ const CodeEditor = () => {
           />
         </div>
 
-        <div className="col-span-12 md:col-span-3 bg-gray-800 p-4 rounded-lg overflow-auto">
-          <h2 className="text-lg font-semibold mb-2">Output</h2>
-          <p className={`text-sm ${outputError ? "text-red-500" : "text-gray-400"}`}>{outputValue.output}</p>
+        <div className="col-span-12 md:col-span-3">
+          <div className="bg-gray-800 h-1/2 p-4 rounded-lg overflow-auto">
+            <h2 className="text-lg font-semibold mb-2">Output</h2>
+            <p
+              className={`text-sm ${
+                outputError ? "text-red-500" : "text-gray-400"
+              }`}
+            >
+              {outputValue.output}
+            </p>
+          </div>
+          <div className="h-1/2 bg-gray-800 mt-2 p-4 rounded-lg overflow-auto">
+            <h2 className="text-lg font-semibold mb-2">Testcase</h2>
+            <textarea
+              className="h-full w-full bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              placeholder="Enter test case input here..."
+            />
+          </div>
         </div>
       </div>
     </div>
