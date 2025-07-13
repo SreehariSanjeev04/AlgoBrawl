@@ -12,4 +12,3 @@ if [[ -e expected.txt ]]; then
 else
     cat output.txt
 fi
-

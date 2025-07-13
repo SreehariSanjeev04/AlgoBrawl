@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require("fs");
 const { exec } = require("child_process");
 const path = require("path");
+const { io } = require("../server")
 
 const MAX_CONTAINERS = process.env.MAX_CONTAINERS || 5;
 let containers = 0;
@@ -77,6 +78,8 @@ router.post("/submit", async (req, res) => {
 
   const { language, code, testcases, expected } = req.body;
   const config = LANGUAGE_CONFIG[language];
+
+  console.log(req.body)
 
   if (!config) {
     return res.status(400).json({ output: "Unsupported language" });

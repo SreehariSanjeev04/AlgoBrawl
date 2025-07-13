@@ -44,7 +44,7 @@ const Match = () => {
 
         fetchMatchDetails()
     }, [])
-    return loading ? <h1>Loading...</h1> : <CodeEditor problem={problem} />
+    return loading ? <h1>Loading...</h1> : <CodeEditor roomId={id} problem={problem} />
 }
 
 export default Match

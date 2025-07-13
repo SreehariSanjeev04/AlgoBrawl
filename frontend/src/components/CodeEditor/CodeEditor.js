@@ -4,8 +4,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { Editor } from "@monaco-editor/react";
 import { LANGUAGE_VERSIONS } from "../lang_constants";
 import { toast } from "sonner";
+import socket from "@/app/socket/socket";
 
-const CodeEditor = ({ problem }) => {
+const CodeEditor = ({ roomId, problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
   const editorRef = useRef(null);
   const [value, setValue] = useState("");
@@ -26,44 +27,53 @@ const CodeEditor = ({ problem }) => {
 
   useEffect(() => {
     if (problem?.testcases.length) {
+      console.log(problem.testcases);
       const inputStr = problem.testcases.map((t) => t.input).join("\n");
-      const expectedStr = problem.testcases.map((t) => t.expected).join("\n");
+      let expectedStr = problem.testcases.map((t) => t.expected).join("\n");
+      expectedStr += "\n";
       setInput(inputStr);
       setExpected(expectedStr);
     }
   }, [problem]);
 
+  useEffect(() => {
+    socket.on("match-ended", (matchData) => {
+      console.log("Hello")
+      if (matchData.result === "win") toast.success(matchData.message);
+      else toast.error(matchData.message);
+    });
+
+    socket.on("solution-feedback", (details) => {
+      setOutputError(!details.passed);
+      setOutputValue(details.message);
+    });
+
+    return () => {
+      socket.off("match-ended");
+      socket.off("solution-feedback");
+    };
+  }, []);
+
   const submitCode = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URI}/submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          language,
-          code: value,
-          testcases: input,
-          expected,
-        }),
+      socket.emit("submit-solution", {
+        roomId,
+        username: "123",
+        language,
+        code: value,
+        testcase: input,
+        expected,
       });
-      console.log(language);
-      console.log(value);
-      console.log(input);
-      console.log(expected);
-      const data = await res.json();
-      console.log(data);
-      setOutputError(!res.ok);
-      setOutputValue(data.output || data.error || "No output");
     } catch (err) {
       console.log(err);
-      setOutputError(err.message || "Could not connect to backend");
+      setOutputError(true);
+      setOutputValue(err.message || "Could not connect to backend");
     } finally {
       setLoading(false);
     }
   };
+
   const runCode = async () => {
     setLoading(true);
     try {
@@ -128,7 +138,7 @@ const CodeEditor = ({ problem }) => {
             loading ? "opacity-60 cursor-not-allowed" : ""
           }`}
         >
-          {loading ? "Running..." : "Submit"}
+          {loading ? "Submitting" : "Submit"}
         </button>
       </div>
 

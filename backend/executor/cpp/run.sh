@@ -4,9 +4,9 @@ if [[ -e expected.txt ]]; then
     cmp --silent output.txt expected.txt
     STATUS=$?
 
-    if [[ STATUS -eq 0]]; then
+    if [[ STATUS -eq 0 ]]; then
         echo "Approved"
-    else 
+    else
         echo "Not Approved"
     fi
 else 
