@@ -27,18 +27,21 @@ function initializeSocket(io) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 roomId,
-                players: [player1.username, player2.username],
+                players: [player1.id, player2.id],
                 problem,
               }),
             }
           );
 
           if (!roomResponse.ok) return;
+          
 
+          console.log(player1.id)
+          console.log(player2.id)
           activeMatches.set(roomId, {
             players: {
-              [player1.username]: player1.socketId,
-              [player2.username]: player2.socketId,
+              [player1.id]: player1.socketId,
+              [player2.id]: player2.socketId,
             },
             problemId: problem._id,
             winner: null,
@@ -69,6 +72,8 @@ function initializeSocket(io) {
       "submit-solution",
       async ({ roomId, username, code, language, testcases, expected }) => {
         const match = activeMatches.get(roomId);
+        console.log("activeMatch: ", activeMatches);
+        console.log(match)
         if (!match || match.winner) return;
 
         try {
@@ -79,6 +84,8 @@ function initializeSocket(io) {
           });
 
           const result = await response.json();
+
+          console.log("Result: ", result)
 
           const approved = result.output?.includes("Approved");
           const winnerSocketId = match.players[username];

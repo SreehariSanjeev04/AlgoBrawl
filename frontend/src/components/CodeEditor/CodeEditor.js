@@ -5,6 +5,7 @@ import { Editor } from "@monaco-editor/react";
 import { LANGUAGE_VERSIONS } from "../lang_constants";
 import { toast } from "sonner";
 import socket from "@/app/socket/socket";
+import { useAuth } from "@/hooks/useAuth";
 
 const CodeEditor = ({ roomId, problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
@@ -19,7 +20,6 @@ const CodeEditor = ({ roomId, problem }) => {
   const [input, setInput] = useState("");
 
   const currentLanguages = Object.entries(LANGUAGE_VERSIONS);
-
   const onMount = (editor) => {
     editorRef.current = editor;
     editor.focus();
@@ -38,7 +38,6 @@ const CodeEditor = ({ roomId, problem }) => {
 
   useEffect(() => {
     socket.on("match-ended", (matchData) => {
-      console.log("Hello")
       if (matchData.result === "win") toast.success(matchData.message);
       else toast.error(matchData.message);
     });
@@ -59,10 +58,10 @@ const CodeEditor = ({ roomId, problem }) => {
     try {
       socket.emit("submit-solution", {
         roomId,
-        username: "123",
+        username: "2",
         language,
         code: value,
-        testcase: input,
+        testcases: input,
         expected,
       });
     } catch (err) {

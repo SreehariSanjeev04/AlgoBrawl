@@ -1,55 +1,60 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import socket from "../socket/socket";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function MatchWaitingPage() {
   const router = useRouter();
+  const { user, loading, isAuthenticated } = useAuth();
 
-  const handleCancel = () => {
-    socket.emit("leave-matchmaking", { id: "123" });
-    router.push("/dashboard");
-  };
 
   useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [loading, isAuthenticated]);
+
+  
+  useEffect(() => {
+    if (loading || !isAuthenticated || !user?.id) return;
+
     const onConnect = () => {
-      console.log("Connected to server with ID: ", socket.id);
+      console.log("Connected to server with ID:", socket.id);
       socket.emit("join-matchmaking", {
-        id: "123",
+        id: user.id,
         difficulty: "Easy",
       });
     };
-    const onMatchStarted = (matchId) => {
-      toast.success("Match Started")
-      setTimeout(() => {
-        router.replace(`/match/${matchId}`);
-      }, 2000)
-    };
-    socket.on("connect_error", (err) => {
-      toast.error(err.message);
-    });
 
-    // acknowledging back
-    socket.on("join-room", (roomId, ack) => {
-      ack();
-    });
+    const onMatchStarted = ({ roomId }) => {
+      toast.success("Match Started");
+      setTimeout(() => {
+        router.replace(`/match/${roomId}`);
+      }, 2000);
+    };
+
+    const onError = (err) => toast.error(`Socket error: ${err.message}`);
 
     socket.on("connect", onConnect);
+    socket.on("match-started", onMatchStarted);
+    socket.on("connect_error", onError);
 
-    socket.on("match-started", ({roomId}) => onMatchStarted(roomId));
-
-    if (!socket.connected) {
-      console.log("Calling socket.connect()");
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("match-started", onMatchStarted);
+      socket.off("connect_error", onError);
     };
-  }, []);
+  }, [loading, isAuthenticated, user?.id]);
+
+  const handleCancel = () => {
+    socket.emit("leave-matchmaking", { id: user?.id });
+    router.push("/dashboard");
+  };
 
   return (
     <main className="flex items-center justify-center h-screen bg-gray-900 text-white px-4">
@@ -61,7 +66,7 @@ export default function MatchWaitingPage() {
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-green-400" />
           <p className="text-xl font-medium text-gray-300">
-            Searching for an opponents
+            Searching for opponents...
           </p>
         </div>
 

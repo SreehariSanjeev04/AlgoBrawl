@@ -33,7 +33,10 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ where: { username } });
+    if(!username || !password) return res.status(400).json({
+      error: "Please fill all the details"
+    })
+    const user = await User.findOne({ where: { username }});
     if (!user) {
       return res.status(400).json({ error: "User does not exist" });
     }
@@ -43,11 +46,11 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const accessToken = jwt.sign({ username }, process.env.JWT_SECRET, {
+    const accessToken = jwt.sign({ username, id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "15m",
     });
 
-    const refreshToken = jwt.sign({ username }, process.env.REFRESH_TOKEN, {
+    const refreshToken = jwt.sign({ username, id: user.id }, process.env.REFRESH_TOKEN, {
       expiresIn: "30d",
     });
 
@@ -61,6 +64,7 @@ router.post("/login", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
+  console.log(id)
   try {
     const user = await User.findByPk(id, {
       attributes: {
@@ -122,6 +126,7 @@ router.post("/refresh-token", async (req, res) => {
 
     const newAccessToken = jwt.sign(
       {
+        id: playload.id,
         username: playload.username,
       },
       process.env.JWT_SECRET,
