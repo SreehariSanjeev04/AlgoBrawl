@@ -1,30 +1,40 @@
 "use client";
 import { redirect } from "next/navigation";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import axios from "axios";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import LoadingScreen from "@/components/LoadingPage/LoadingPage";
 
 const Login = () => {
   const [details, setDetails] = useState({
     username: "",
     password: "",
   });
+
+  const { user, login, logout, isAuthenticated, loading } = useAuth();
+
+  const BACKEND_URI = process.env.NEXT_PUBLIC_BACKEND_URI;
+
+  const router = useRouter();
   const handleLogin = async (e) => {
     e.preventDefault();
-    const res = await fetch("http://localhost:5000/api/user/login", {
-      method: "POST",
-      credentials: "include",
+    const res = await axios.post(`${BACKEND_URI}/user/login`, details, {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify(details),
+      withCredentials: true,
     });
 
-    const data = await res.json();
-    if (res.ok) {
-      localStorage.setItem("access-token", data.accessToken);
-      redirect("/dashboard");
+    const data = res.data;
+    if (res.status !== 200) {
+      toast.error("Login failed");
     } else {
-      alert(data.error);
+      toast.success("Login successful");
+      router.replace("/");
+      login(data.user, data.accessToken);
     }
   };
   const handleChange = (e) => {
@@ -33,6 +43,16 @@ const Login = () => {
       [e.target.id]: e.target.value,
     }));
   };
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      router.replace("/");
+    }
+  }, [loading, isAuthenticated]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="bg-gray-900 bg-opacity-80 backdrop-blur-lg rounded-xl shadow-xl p-10 max-w-md w-full border border-gray-700">

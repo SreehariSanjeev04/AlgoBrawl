@@ -8,7 +8,7 @@ const sequelize = require("./database/db");
 const userRouter = require("./routes/UserRoutes");
 const problemRouter = require("./routes/ProblemRoutes");
 const httpServer = require("http").createServer(app);
-const { initializeSocket } =  require("./socket")
+const { initializeSocket } = require("./socket/socket")
 const matchRouter = require("./routes/MatchRoutes");
 
 const io = require("socket.io")(httpServer, {

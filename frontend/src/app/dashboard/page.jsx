@@ -1,12 +1,34 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import LoadingScreen from "@/components/LoadingPage/LoadingPage";
+import { useRouter } from "next/navigation";
 
-const UserDashboard = ({ user }) => {
+const UserDashboard = () => {
+  const { user, loading, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      if (!isAuthenticated) {
+        router.replace("/login");
+      } else {
+        setShouldRender(true);
+      }
+    }
+  }, [loading, isAuthenticated]);
+
+  if (loading || !shouldRender) {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white px-6 py-8">
       <h1 className="text-3xl font-bold mb-6">
-        Welcome, <span className="text-green-400">{user?.username}</span> 
+        Welcome, <span className="text-green-400">{user?.username}</span>
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -30,7 +52,6 @@ const UserDashboard = ({ user }) => {
           <li>🟢 You won against `opponent1`</li>
           <li>🔴 You lost to `opponent2`</li>
           <li>🟢 You won against `opponent3`</li>
-          {/* Dynamically generate this later */}
         </ul>
       </div>
 

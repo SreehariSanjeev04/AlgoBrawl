@@ -2,14 +2,14 @@ const User = require("../models/User");
 const router = require("express").Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const auth = require("../middleware/auth");
 
 const COOKIE_OPTIONS = {
-  maxAge: 30 * 24 * 60 * 60 * 1000, 
+  maxAge: 30 * 24 * 60 * 60 * 1000,
   httpOnly: true,
   sameSite: "lax",
-  secure: process.env.NODE_ENV === "production"
+  secure: process.env.NODE_ENV === "production",
 };
-
 
 router.post("/register", async (req, res) => {
   try {
@@ -30,7 +30,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -45,11 +44,11 @@ router.post("/login", async (req, res) => {
     }
 
     const accessToken = jwt.sign({ username }, process.env.JWT_SECRET, {
-      expiresIn: "15m"
+      expiresIn: "15m",
     });
 
     const refreshToken = jwt.sign({ username }, process.env.REFRESH_TOKEN, {
-      expiresIn: "30d"
+      expiresIn: "30d",
     });
 
     res.cookie("refresh-token", refreshToken, COOKIE_OPTIONS);
@@ -60,11 +59,14 @@ router.post("/login", async (req, res) => {
   }
 });
 
-
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(id, {
+      attributes: {
+        exclude: ["password"],
+      },
+    });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -74,31 +76,67 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.get("/", async(req,res) => {
-    try {
-        const users = await User.findAll({
-            attributes: { exclude: ["password"] }
-        })
-        res.status(200).json(users)
-    } catch(err) {
-        console.log(err)
-        res.status(500).json({ error: "Internal Server Error" })
-    }
-})
+router.get("/", async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: { exclude: ["password"] },
+    });
+    res.status(200).json(users);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-router.get("/validate", async(req, res) => {
-    try {
-        const authHeader = req.headers["authorization"]
-        const access_token = authHeader.split(' ')[1]
-        if(!access_token) {
-            res.status(401).json({error: "No access token"})
-        }
-        jwt.verify(access_token, process.env.JWT_SECRET, (err, user) => {
-            if(err) res.status(200).json({error: "Unauthorized Access"})
-        })
-    } catch(err) {
-        res.status(500).json({error: "Internal Server Error"})
+router.post("/validate", async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const access_token = authHeader.split(" ")[1];
+    if (!access_token) {
+      res.status(401).json({ error: "No access token" });
     }
-})
+    jwt.verify(access_token, process.env.JWT_SECRET, (err, user) => {
+      if (err) return res.status(401).json({ error: "Unauthorized Access" });
+      res.status(200).json(user);
+    });
+  } catch (err) {
+    console.log(err)
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.post("/refresh-token", async (req, res) => {
+  try {
+    const refresh_token = req.cookies.refresh_token;
+    const authHeader = req.headers["authorization"];
+
+    const access_token = authHeader.split(" ")[1];
+
+    if (!access_token || !refresh_token) {
+      return res.status(401).json({
+        error: "Kindly login again",
+      });
+    }
+
+    const playload = jwt.verify(access_token, process.env.JWT_SECRET);
+
+    const newAccessToken = jwt.sign(
+      {
+        username: playload.username,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m",
+      }
+    );
+
+    res.status(200).json({
+      accessToken: newAccessToken,
+      user: {
+        username: playload.username,
+      },
+    });
+  } catch (err) {}
+});
 
 module.exports = router;
