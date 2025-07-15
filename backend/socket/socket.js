@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const queue = [];
 const activeMatches = new Map();
 const axios = require("axios");
+const dotenv = require("dotenv").config()
 
 const eloRating = (Ra, Rb) => {
   return 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
@@ -78,7 +79,6 @@ const initializeSocket = (io) => {
       "submit-solution",
       async ({
         roomId,
-        problemId,
         username,
         code,
         language,
@@ -91,6 +91,7 @@ const initializeSocket = (io) => {
         if (!match || match.winner) return;
 
         try {
+          console.log("Entreing Try Block")
           const response = await fetch("http://localhost:5000/api/submit", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -101,8 +102,9 @@ const initializeSocket = (io) => {
 
           const approved = result.output?.includes("Approved");
 
+          console.log('Submission request')
           const submission = await axios.post(`${process.env.BACKEND_URI}/submission/add`, {
-            user_id: username,
+            user_id: parseInt(username),
             match_id: roomId,
             code,
             language,
@@ -114,7 +116,7 @@ const initializeSocket = (io) => {
               "x-internal-secret": process.env.INTERNAL_SECRET
             }
           })
-
+          console.log("Submission complete")
           console.log("Submmision: ", submission.data)
           const winnerSocketId = match.players[username];
           const loserUsername = Object.keys(match.players).find(
@@ -134,7 +136,7 @@ const initializeSocket = (io) => {
               "http://localhost:5000/api/match/store-match",
               {
                 room_id: roomId,
-                problem_id: problemId,
+                problem_id: match.problemId,
                 player1_id: username,
                 player2_id: loserUsername,
                 winner: username,
@@ -169,6 +171,7 @@ const initializeSocket = (io) => {
               });
           }
         } catch (err) {
+          console.log(err)
           const fallbackSocketId = match?.players?.[username];
           if (fallbackSocketId) {
             io.to(fallbackSocketId).emit("solution-feedback", {

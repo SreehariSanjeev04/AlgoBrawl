@@ -26,7 +26,7 @@ router.post("/add", async (req, res) => {
       result,
     });
 
-    res.status(200).json(submission);
+    res.status(200).json({submission});
   } catch (err) {
     res.status(500).json({
       error: "Internal Server Error",

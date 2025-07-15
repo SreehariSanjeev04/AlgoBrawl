@@ -49,8 +49,14 @@ router.get("/remove-match/:matchId", async (req, res) => {
   res.status(200).json({ message: "Match removed successfully" });
 });
 
-router.get("/store-match", auth, async (req, res) => {
+router.post("/store-match", async (req, res) => {
   try {
+    const secret = req.headers["x-internal-secret"]
+    if(!secret) {
+      return res.status(401).json({
+        error: "Secret Invalid"
+      })
+    }
     const { room_id, problem_id, player1_id, player2_id, winner } = req.body;
     if (!room_id || !problem_id || !player1_id || !player2_id || !winner) {
       return res.status(400).json({

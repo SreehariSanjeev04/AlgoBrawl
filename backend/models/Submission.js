@@ -13,7 +13,7 @@ const Submission = sequelize.define("Submission", {
         allowNull: false
     },
     match_id: {
-        type: DataTypes.INTEGER,   
+        type: DataTypes.STRING,   
     },
     code: {
         type: DataTypes.TEXT,
