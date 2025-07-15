@@ -25,7 +25,7 @@ const User = sequelize.define('User', {
     },
     rating: {
         type: DataTypes.INTEGER,
-        defaultValue: 0,
+        defaultValue: 800,
     },
     matches_played: {
         type: DataTypes.INTEGER,

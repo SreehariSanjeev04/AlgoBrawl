@@ -2,6 +2,14 @@ const crypto = require("crypto");
 const queue = [];
 const activeMatches = new Map();
 
+const eloRating = (Ra, Rb) => {
+  return 1/(1 + Math.pow(10, (Ra-Rb)/400))
+}
+
+const finalScore = (Ra, Sa, Ea) => {
+  return Ra + 50(Sa - Ea)
+}
+
 function initializeSocket(io) {
   io.on("connection", (socket) => {
     console.log(`${socket.id} connected`);
@@ -35,15 +43,12 @@ function initializeSocket(io) {
 
           if (!roomResponse.ok) return;
           
-
-          console.log(player1.id)
-          console.log(player2.id)
           activeMatches.set(roomId, {
             players: {
               [player1.id]: player1.socketId,
               [player2.id]: player2.socketId,
             },
-            problemId: problem._id,
+            problemId: problem.id,
             winner: null,
           });
 
