@@ -144,4 +144,23 @@ router.post("/refresh-token", async (req, res) => {
   } catch (err) {}
 });
 
+router.post("/update-score", async(req, res) => {
+  const secret = req.headers["x-internal-secret"]
+  if(!secret || secret != process.env.INTERNAL_SECRET) {
+    return res.status(401).json({
+      error: "Invalid Secret"
+    })
+  }
+  const {user_id, new_score} = req.body
+  if(!new_score) {
+    return res.status(400).json({
+      error: "Incomplete details"
+    })
+  }
+
+  const user = await User.findByPk(user_id)
+  user.rating = new_score
+  await user.save()
+})
+
 module.exports = router;
