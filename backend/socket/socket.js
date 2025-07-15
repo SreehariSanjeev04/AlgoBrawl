@@ -1,16 +1,17 @@
 const crypto = require("crypto");
 const queue = [];
 const activeMatches = new Map();
+const axios = require("axios");
 
 const eloRating = (Ra, Rb) => {
-  return 1/(1 + Math.pow(10, (Ra-Rb)/400))
-}
+  return 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
+};
 
 const finalScore = (Ra, Sa, Ea) => {
-  return Ra + 50(Sa - Ea)
-}
+  return Ra + 50*(Sa - Ea);
+};
 
-function initializeSocket(io) {
+const initializeSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`${socket.id} connected`);
 
@@ -42,7 +43,7 @@ function initializeSocket(io) {
           );
 
           if (!roomResponse.ok) return;
-          
+
           activeMatches.set(roomId, {
             players: {
               [player1.id]: player1.socketId,
@@ -75,10 +76,18 @@ function initializeSocket(io) {
 
     socket.on(
       "submit-solution",
-      async ({ roomId, username, code, language, testcases, expected }) => {
+      async ({
+        roomId,
+        problemId,
+        username,
+        code,
+        language,
+        testcases,
+        expected,
+      }) => {
         const match = activeMatches.get(roomId);
         console.log("activeMatch: ", activeMatches);
-        console.log(match)
+        console.log(match);
         if (!match || match.winner) return;
 
         try {
@@ -90,42 +99,74 @@ function initializeSocket(io) {
 
           const result = await response.json();
 
-          console.log("Result: ", result)
-
           const approved = result.output?.includes("Approved");
+
+          const submission = await axios.post(`${process.env.BACKEND_URI}/submission/add`, {
+            user_id: username,
+            match_id: roomId,
+            code,
+            language,
+            result: approved ? "Approved" : "Not Approved"
+          }, {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "x-internal-secret": process.env.INTERNAL_SECRET
+            }
+          })
+
+          console.log("Submmision: ", submission.data)
           const winnerSocketId = match.players[username];
           const loserUsername = Object.keys(match.players).find(
             (u) => u !== username
           );
           const loserSocketId = match.players[loserUsername];
 
-          if (approved) {
+          if(submission.status !== 200) {
+            io.to(winnerSocketId).emit("solution-feedback", {
+              passed: false,
+              message: "Could not submit the solution"
+            })
+          }
+          else if (approved) {
             match.winner = username;
+            const res = await axios.post(
+              "http://localhost:5000/api/match/store-match",
+              {
+                room_id: roomId,
+                problem_id: problemId,
+                player1_id: username,
+                player2_id: loserUsername,
+                winner: username,
+              },
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                  "x-internal-secret": process.env.INTERNAL_SECRET,
+                },
+              }
+            );
 
-            await fetch("http://localhost:5000/api/match/submit-result", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ roomId, winner: username }),
-            });
+            if (res.status === 200) {
+              console.log("Room has been stored")
+              io.to(winnerSocketId).emit("match-ended", {
+                result: "win",
+                message: "You have won!",
+              });
 
-            io.to(winnerSocketId).emit("match-ended", {
-              result: "win",
-              message: "You have won!",
-            });
-
-            io.to(loserSocketId).emit("match-ended", {
-              result: "lose",
-              message: `${username} has won the match.`,
-            });
-
+              io.to(loserSocketId).emit("match-ended", {
+                result: "lose",
+                message: `${username} has won the match.`,
+              });
+            }
             activeMatches.delete(roomId);
           } else {
             console.log("Winner: ", winnerSocketId),
-            io.to(winnerSocketId).emit("solution-feedback", {
-              
-              passed: false,
-              message: "Incorrect output. Try again.",
-            });
+              io.to(winnerSocketId).emit("solution-feedback", {
+                passed: false,
+                message: "Incorrect output. Try again.",
+              });
           }
         } catch (err) {
           const fallbackSocketId = match?.players?.[username];

@@ -10,6 +10,7 @@ const problemRouter = require("./routes/ProblemRoutes");
 const httpServer = require("http").createServer(app);
 const { initializeSocket } = require("./socket/socket")
 const matchRouter = require("./routes/MatchRoutes");
+const submissionRouter = require("./routes/SubmissionRoutes")
 
 const io = require("socket.io")(httpServer, {
   cors: {
@@ -30,6 +31,7 @@ app.use("/api", execRouter);
 app.use("/api/user", userRouter);
 app.use("/api/problem", problemRouter);
 app.use("/api/match", matchRouter);
+app.use("/api/submission", submissionRouter);
 
 initializeSocket(io)
 const PORT = process.env.PORT || 3000;

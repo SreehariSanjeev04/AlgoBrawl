@@ -1,6 +1,7 @@
 const Matches = new Map();
 const router = require("express").Router();
 const Match = require("../models/Match");
+const auth = require("../middleware/auth")
 
 router.post("/create-match", async (req, res) => {
   const { roomId, players, problem } = req.body;
@@ -48,7 +49,7 @@ router.get("/remove-match/:matchId", async (req, res) => {
   res.status(200).json({ message: "Match removed successfully" });
 });
 
-router.get("/store-match", async (req, res) => {
+router.get("/store-match", auth, async (req, res) => {
   try {
     const { room_id, problem_id, player1_id, player2_id, winner } = req.body;
     if (!room_id || !problem_id || !player1_id || !player2_id || !winner) {
