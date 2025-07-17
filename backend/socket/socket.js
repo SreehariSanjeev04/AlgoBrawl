@@ -8,8 +8,8 @@ const eloRating = (Ra, Rb) => {
   return 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
 };
 
-const finalScore = (Ra, Sa, Ea) => {
-  return Ra + 50*(Sa - Ea);
+const finalScore = (Ra, Rb, Sa) => {
+  return Ra + 50*(Sa - eloRating(Ra, Rb));
 };
 
 const initializeSocket = (io) => {
@@ -23,6 +23,8 @@ const initializeSocket = (io) => {
         const player1 = queue.shift();
         const player2 = queue.shift();
         const roomId = crypto.randomUUID();
+
+        console.log(player1)
 
         try {
           const response = await fetch(
@@ -49,6 +51,10 @@ const initializeSocket = (io) => {
             players: {
               [player1.id]: player1.socketId,
               [player2.id]: player2.socketId,
+            },
+            ratings: {
+              [player1.id]: player1.rating,
+              [player2.id]: player2.rating,
             },
             problemId: problem.id,
             winner: null,
@@ -91,7 +97,7 @@ const initializeSocket = (io) => {
         if (!match || match.winner) return;
 
         try {
-          console.log("Entreing Try Block")
+          console.log("Entering Try Block")
           const response = await fetch("http://localhost:5000/api/submit", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -159,10 +165,36 @@ const initializeSocket = (io) => {
 
               io.to(loserSocketId).emit("match-ended", {
                 result: "lose",
-                message: `${username} has won the match.`,
+                message: `Opponent has won the match.`,
               });
             }
-            activeMatches.delete(roomId);
+
+            // update the score
+            
+            const winRating = match.ratings[username]
+            const loseRating = match.ratings[Object.keys(match.ratings).find(key => key != username)]
+            const winnerUpdate = await axios.put(`${process.env.BACKEND_URI}/user/update-score`, {
+              user_id: parseInt(username),
+              new_score: finalScore(winRating, loseRating, 1)
+            }, {
+              headers: {
+                "x-internal-secret": process.env.INTERNAL_SECRET
+              }
+            })
+
+            const loserUpdate = await axios.put(`${process.env.BACKEND_URI}/user/update-score`, {
+              user_id: parseInt(loserUsername),
+              new_score: finalScore(loseRating, winRating, 0)
+            }, {
+              headers: {
+                "x-internal-secret": process.env.INTERNAL_SECRET
+              }
+            })
+
+            if(loserUpdate.status === 200 && winnerUpdate.status === 200) {
+              console.log("Scores updated successfully")
+              activeMatches.delete(roomId);
+            }
           } else {
             console.log("Winner: ", winnerSocketId),
               io.to(winnerSocketId).emit("solution-feedback", {

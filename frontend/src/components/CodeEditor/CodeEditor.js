@@ -5,19 +5,23 @@ import { Editor } from "@monaco-editor/react";
 import { LANGUAGE_VERSIONS } from "../lang_constants";
 import { toast } from "sonner";
 import socket from "@/app/socket/socket";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import BOILERPLATE from "../Constants/boilerplate";
 
 const CodeEditor = ({ roomId, problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
   const editorRef = useRef(null);
-  const [value, setValue] = useState("");
   const [language, setLanguage] = useState("javascript");
+  const [value, setValue] = useState(BOILERPLATE[language] || "");
   const [outputValue, setOutputValue] = useState("// Output will appear here");
   const [outputError, setOutputError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testcase, setTestcase] = useState("");
   const [expected, setExpected] = useState("");
   const [input, setInput] = useState("");
+  const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
 
   const currentLanguages = Object.entries(LANGUAGE_VERSIONS);
   const onMount = (editor) => {
@@ -37,9 +41,16 @@ const CodeEditor = ({ roomId, problem }) => {
   }, [problem]);
 
   useEffect(() => {
+    setValue(BOILERPLATE[language] || "");
+  }, [language]);
+
+  useEffect(() => {
     socket.on("match-ended", (matchData) => {
       if (matchData.result === "win") toast.success(matchData.message);
       else toast.error(matchData.message);
+      setInterval(() => {
+        router.push("/dashboard");
+      }, 5000);
     });
 
     socket.on("solution-feedback", (details) => {
@@ -58,7 +69,7 @@ const CodeEditor = ({ roomId, problem }) => {
     try {
       socket.emit("submit-solution", {
         roomId,
-        username: "2",
+        username: user?.id,
         language,
         code: value,
         testcases: input,
@@ -179,7 +190,7 @@ const CodeEditor = ({ roomId, problem }) => {
             theme="vs-dark"
             height="100%"
             language={language}
-            defaultValue="// Write your code here"
+            defaultValue={BOILERPLATE[language] || ""}
             value={value}
             onChange={(val) => setValue(val || "")}
             onMount={onMount}

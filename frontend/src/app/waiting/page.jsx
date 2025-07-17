@@ -20,12 +20,13 @@ export default function MatchWaitingPage() {
   
   useEffect(() => {
     if (loading || !isAuthenticated || !user?.id) return;
-
+    console.log("Rating:", user.rating);
     const onConnect = () => {
       console.log("Connected to server with ID:", socket.id);
       socket.emit("join-matchmaking", {
         id: user.id,
         difficulty: "Easy",
+        rating: user.rating
       });
     };
 

@@ -33,10 +33,11 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    if(!username || !password) return res.status(400).json({
-      error: "Please fill all the details"
-    })
-    const user = await User.findOne({ where: { username }});
+    if (!username || !password)
+      return res.status(400).json({
+        error: "Please fill all the details",
+      });
+    const user = await User.findOne({ where: { username } });
     if (!user) {
       return res.status(400).json({ error: "User does not exist" });
     }
@@ -46,13 +47,21 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const accessToken = jwt.sign({ username, id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "15m",
-    });
+    const accessToken = jwt.sign(
+      { username, id: user.id, rating: user.rating },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m",
+      }
+    );
 
-    const refreshToken = jwt.sign({ username, id: user.id }, process.env.REFRESH_TOKEN, {
-      expiresIn: "30d",
-    });
+    const refreshToken = jwt.sign(
+      { username, id: user.id, rating: user.rating },
+      process.env.REFRESH_TOKEN,
+      {
+        expiresIn: "30d",
+      }
+    );
 
     res.cookie("refresh-token", refreshToken, COOKIE_OPTIONS);
     return res.status(200).json({ user, accessToken });
@@ -64,7 +73,7 @@ router.post("/login", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
-  console.log(id)
+  console.log(id);
   try {
     const user = await User.findByPk(id, {
       attributes: {
@@ -104,7 +113,7 @@ router.post("/validate", async (req, res) => {
       res.status(200).json(user);
     });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -144,23 +153,36 @@ router.post("/refresh-token", async (req, res) => {
   } catch (err) {}
 });
 
-router.post("/update-score", async(req, res) => {
-  const secret = req.headers["x-internal-secret"]
-  if(!secret || secret != process.env.INTERNAL_SECRET) {
-    return res.status(401).json({
-      error: "Invalid Secret"
-    })
-  }
-  const {user_id, new_score} = req.body
-  if(!new_score) {
-    return res.status(400).json({
-      error: "Incomplete details"
-    })
+router.put("/update-score", async (req, res) => {
+  const secret = req.headers["x-internal-secret"];
+  if (!secret || secret !== process.env.INTERNAL_SECRET) {
+    return res.status(401).json({ error: "Invalid Secret" });
   }
 
-  const user = await User.findByPk(user_id)
-  user.rating = new_score
-  await user.save()
-})
+  const { user_id, new_score } = req.body;
+
+  if (
+    typeof user_id !== "number" ||
+    typeof new_score !== "number" ||
+    !Number.isInteger(user_id)
+  ) {
+    return res.status(400).json({ error: "Invalid user_id or score" });
+  }
+
+  try {
+    const user = await User.findByPk(user_id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.rating = new_score;
+    await user.save();
+
+    return res.json({ message: "User score updated successfully", user });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 module.exports = router;

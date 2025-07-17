@@ -49,7 +49,7 @@ router.post("/run", async (req, res) => {
     fs.writeFileSync(filepath, code);
     fs.writeFileSync(inputpath, testcases)
 
-    const command = `timeout 5 docker run --rm --memory=100m --cpus=0.5 -v ${filepath}:/code/${config.file} -v ${inputpath}:/code/input.txt ${config.image}`;
+    const command = `timeout -k 5s 5s docker run --rm --memory=100m --cpus=0.5 -v ${filepath}:/code/${config.file} -v ${inputpath}:/code/input.txt ${config.image}`;
     exec(command, (err, stdout, stderr) => {
       containers--;
       [inputpath, filepath].forEach((f) => {
