@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import socket from "../socket/socket";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { MoonLoader } from "react-spinners";
 
 export default function MatchWaitingPage() {
   const router = useRouter();
@@ -58,26 +59,14 @@ export default function MatchWaitingPage() {
   };
 
   return (
-    <main className="flex items-center justify-center h-screen bg-gray-900 text-white px-4">
-      <div className="text-center space-y-8">
-        <h1 className="text-4xl font-bold text-green-400 tracking-widest">
-          AlgoBrawl
-        </h1>
-
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-green-400" />
-          <p className="text-xl font-medium text-gray-300">
-            Searching for opponents...
-          </p>
-        </div>
-
-        <button
-          onClick={handleCancel}
-          className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-white font-semibold transition"
-        >
-          Cancel Match
-        </button>
-      </div>
-    </main>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+          <div className="flex flex-col items-center gap-6 animate-fadeIn">
+            <MoonLoader color="#a855f7" size={60} />
+            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500">
+              AlgoBrawl
+            </h1>
+            <p className="text-sm text-gray-400">Preparing your battle arena...</p>
+          </div>
+        </div>  
   );
 }

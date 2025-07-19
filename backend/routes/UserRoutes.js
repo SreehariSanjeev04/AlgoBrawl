@@ -93,6 +93,9 @@ router.get("/", async (req, res) => {
   try {
     const users = await User.findAll({
       attributes: { exclude: ["password"] },
+      order: [
+        ["rating", "DESC"],
+      ]
     });
     res.status(200).json(users);
   } catch (err) {
