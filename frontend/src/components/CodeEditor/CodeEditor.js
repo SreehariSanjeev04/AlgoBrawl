@@ -20,6 +20,7 @@ const CodeEditor = ({ roomId, problem }) => {
   const [testcase, setTestcase] = useState("");
   const [expected, setExpected] = useState("");
   const [input, setInput] = useState("");
+  const [timeLeft, setTimeLeft] = useState(10);
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -28,6 +29,21 @@ const CodeEditor = ({ roomId, problem }) => {
     editorRef.current = editor;
     editor.focus();
   };
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      toast.error("Time's up! Auto-submitting your code.");
+      submitCode(true);
+
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft]);
 
   useEffect(() => {
     if (problem?.testcases.length) {
@@ -39,6 +55,14 @@ const CodeEditor = ({ roomId, problem }) => {
       setExpected(expectedStr);
     }
   }, [problem]);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
 
   useEffect(() => {
     setValue(BOILERPLATE[language] || "");
@@ -64,7 +88,7 @@ const CodeEditor = ({ roomId, problem }) => {
     };
   }, []);
 
-  const submitCode = async () => {
+  const submitCode = async (isAuto) => {
     setLoading(true);
     try {
       socket.emit("submit-solution", {
@@ -74,6 +98,7 @@ const CodeEditor = ({ roomId, problem }) => {
         code: value,
         testcases: input,
         expected,
+        isAuto
       });
     } catch (err) {
       console.log(err);
@@ -132,6 +157,7 @@ const CodeEditor = ({ roomId, problem }) => {
             ))}
           </select>
         </div>
+
         <button
           onClick={runCode}
           disabled={loading}
@@ -142,7 +168,7 @@ const CodeEditor = ({ roomId, problem }) => {
           {loading ? "Running..." : "Run"}
         </button>
         <button
-          onClick={submitCode}
+          onClick={() => submitCode(false)}
           disabled={loading}
           className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
             loading ? "opacity-60 cursor-not-allowed" : ""
@@ -150,6 +176,10 @@ const CodeEditor = ({ roomId, problem }) => {
         >
           {loading ? "Submitting" : "Submit"}
         </button>
+
+        <div className="ml-auto text-white text-sm font-mono bg-gray-700 px-3 py-1 rounded">
+          Time Left: {formatTime(timeLeft)}
+        </div>
       </div>
 
       <div className="flex-1 grid grid-cols-12 gap-4 p-4">

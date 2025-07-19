@@ -2,14 +2,109 @@ const crypto = require("crypto");
 const queue = [];
 const activeMatches = new Map();
 const axios = require("axios");
-const dotenv = require("dotenv").config()
+require("dotenv").config();
 
-const eloRating = (Ra, Rb) => {
-  return 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
-};
+const BACKEND = process.env.BACKEND_URI;
+const SECRET = process.env.INTERNAL_SECRET;
 
-const finalScore = (Ra, Rb, Sa) => {
-  return Ra + 50*(Sa - eloRating(Ra, Rb));
+const eloRating = (Ra, Rb) => 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
+const finalScore = (Ra, Rb, Sa) => Ra + 50 * (Sa - eloRating(Ra, Rb));
+const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
+  const [p1, p2] = Object.keys(match.players);
+  const loser = winner === p1 ? p2 : p1;
+
+  try {
+    await axios.post(
+      `${BACKEND}/match/store-match`,
+      {
+        room_id: roomId,
+        problem_id: match.problemId,
+        player1_id: parseInt(p1),
+        player2_id: parseInt(p2),
+        winner: isDraw ? -1 : winner,
+      },
+      {
+        headers: { "x-internal-secret": SECRET },
+      }
+    );
+
+    const socket1 = match.players[p1];
+    const socket2 = match.players[p2];
+
+    if (isDraw) {
+      io.to(socket1).emit("match-ended", {
+        result: "draw",
+        message: "The match ended in a draw.",
+      });
+
+      io.to(socket2).emit("match-ended", {
+        result: "draw",
+        message: "The match ended in a draw.",
+      });
+
+      const newScore1 = Math.floor(
+        finalScore(match.ratings[p1], match.ratings[p2], 0.5)
+      );
+      const newScore2 = Math.floor(
+        finalScore(match.ratings[p2], match.ratings[p1], 0.5)
+      );
+
+      await axios.put(
+        `${BACKEND}/user/update-score`,
+        {
+          user_id: parseInt(p1),
+          new_score: newScore1,
+        },
+        { headers: { "x-internal-secret": SECRET } }
+      );
+
+      await axios.put(
+        `${BACKEND}/user/update-score`,
+        {
+          user_id: parseInt(p2),
+          new_score: newScore2,
+        },
+        { headers: { "x-internal-secret": SECRET } }
+      );
+    } else {
+      const winnerSocket = match.players[winner];
+      const loserSocket = match.players[loser];
+
+      io.to(winnerSocket).emit("match-ended", {
+        result: "win",
+        message: "You have won!",
+      });
+
+      io.to(loserSocket).emit("match-ended", {
+        result: "lose",
+        message: "Opponent has won the match.",
+      });
+
+      const winRating = match.ratings[winner];
+      const loseRating = match.ratings[loser];
+
+      await axios.put(
+        `${BACKEND}/user/update-score`,
+        {
+          user_id: parseInt(winner),
+          new_score: Math.floor(finalScore(winRating, loseRating, 1)),
+        },
+        { headers: { "x-internal-secret": SECRET } }
+      );
+
+      await axios.put(
+        `${BACKEND}/user/update-score`,
+        {
+          user_id: parseInt(loser),
+          new_score: Math.floor(finalScore(loseRating, winRating, 0)),
+        },
+        { headers: { "x-internal-secret": SECRET } }
+      );
+    }
+    activeMatches.delete(roomId);
+  } catch (err) {
+    console.error("Error storing match result:", err.message);
+  }
 };
 
 const initializeSocket = (io) => {
@@ -24,28 +119,21 @@ const initializeSocket = (io) => {
         const player2 = queue.shift();
         const roomId = crypto.randomUUID();
 
-        console.log(player1)
-
         try {
-          const response = await fetch(
+          const problemRes = await fetch(
             `http://localhost:5000/api/problem/generate?difficulty=${user.difficulty}`
           );
-          const problem = await response.json();
+          const problem = await problemRes.json();
 
-          const roomResponse = await fetch(
-            "http://localhost:5000/api/match/create-match",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                roomId,
-                players: [player1.id, player2.id],
-                problem,
-              }),
-            }
-          );
-
-          if (!roomResponse.ok) return;
+          await fetch("http://localhost:5000/api/match/create-match", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomId,
+              players: [player1.id, player2.id],
+              problem,
+            }),
+          });
 
           activeMatches.set(roomId, {
             players: {
@@ -58,25 +146,28 @@ const initializeSocket = (io) => {
             },
             problemId: problem.id,
             winner: null,
+            submitted: {
+              [player1.id]: false,
+              [player2.id]: false,
+            },
+            isAutoSubmit: {
+              [player1.id]: false,
+              [player2.id]: false,
+            },
+            approved: {
+              [player1.id]: false,
+              [player2.id]: false,
+            },
           });
 
-          const p1Socket = io.sockets.sockets.get(player1.socketId);
-          const p2Socket = io.sockets.sockets.get(player2.socketId);
-
-          let joined = 0;
-          const onJoined = () => {
-            joined++;
-            if (joined == 2) {
-              io.to(roomId).emit("match-started", { roomId });
-            }
-          };
-
-          [p1Socket, p2Socket].forEach((soc) => {
-            soc.join(roomId);
-            onJoined();
+          [player1, player2].forEach(({ socketId }) => {
+            const playerSocket = io.sockets.sockets.get(socketId);
+            playerSocket?.join(roomId);
           });
+
+          io.to(roomId).emit("match-started", { roomId });
         } catch (err) {
-          console.error("Matchmaking error:", err);
+          console.error("Matchmaking failed:", err.message);
         }
       }
     });
@@ -90,149 +181,107 @@ const initializeSocket = (io) => {
         language,
         testcases,
         expected,
+        isAuto,
       }) => {
         const match = activeMatches.get(roomId);
-        console.log("activeMatch: ", activeMatches);
-        console.log(match);
         if (!match || match.winner) return;
 
         try {
-          console.log("Entering Try Block")
-          const response = await fetch("http://localhost:5000/api/submit", {
+          const res = await fetch("http://localhost:5000/api/submit", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ language, code, testcases, expected }),
           });
 
-          const result = await response.json();
-
+          const result = await res.json();
           const approved = result.output?.includes("Approved");
 
-          console.log('Submission request')
-          const submission = await axios.post(`${process.env.BACKEND_URI}/submission/add`, {
-            user_id: parseInt(username),
-            match_id: roomId,
-            code,
-            language,
-            result: approved ? "Approved" : "Not Approved"
-          }, {
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              "x-internal-secret": process.env.INTERNAL_SECRET
+          match.submitted[username] = true;
+          match.approved[username] = approved;
+          match.isAutoSubmit[username] = isAuto || false;
+
+          await axios.post(
+            `${BACKEND}/submission/add`,
+            {
+              user_id: parseInt(username),
+              match_id: roomId,
+              code,
+              language,
+              result: approved ? "Approved" : "Not Approved",
+            },
+            {
+              headers: { "x-internal-secret": SECRET },
             }
-          })
-          console.log("Submission complete")
-          console.log("Submmision: ", submission.data)
-          const winnerSocketId = match.players[username];
-          const loserUsername = Object.keys(match.players).find(
+          );
+
+          const opponent = Object.keys(match.players).find(
             (u) => u !== username
           );
-          const loserSocketId = match.players[loserUsername];
-
-          if(submission.status !== 200) {
-            io.to(winnerSocketId).emit("solution-feedback", {
-              passed: false,
-              message: "Could not submit the solution"
-            })
-          }
-          else if (approved) {
+          if (approved && !match.winner) {
             match.winner = username;
-            const res = await axios.post(
-              "http://localhost:5000/api/match/store-match",
-              {
-                room_id: roomId,
-                problem_id: match.problemId,
-                player1_id: username,
-                player2_id: loserUsername,
-                winner: username,
-              },
-              {
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                  "x-internal-secret": process.env.INTERNAL_SECRET,
-                },
-              }
-            );
+            await storeMatchResult(roomId, match, username, io, false);
+            return;
+          }
 
-            if (res.status === 200) {
-              console.log("Room has been stored")
-              io.to(winnerSocketId).emit("match-ended", {
-                result: "win",
-                message: "You have won!",
-              });
+          const bothSubmitted =
+            match.submitted[username] && match.submitted[opponent];
+          const bothAuto =
+            match.isAutoSubmit[username] && match.isAutoSubmit[opponent];
+          const bothFailed =
+            !match.approved[username] && !match.approved[opponent];
 
-              io.to(loserSocketId).emit("match-ended", {
-                result: "lose",
-                message: `Opponent has won the match.`,
-              });
+          if (bothSubmitted && !match.winner) {
+            if (match.approved[opponent]) {
+              match.winner = opponent;
+              await storeMatchResult(roomId, match, opponent, io, false);
+            } else if (bothAuto && bothFailed) {
+              console.log("Both players failed, ending match as a draw");
+              await storeMatchResult(roomId, match, username, io, true);
             }
+            activeMatches.delete(roomId);
+          } else if (!approved) {
+            console.log("Reached here with non-approved submission");
+            io.to(socket.id).emit("solution-feedback", {
+              passed: false,
+              message: "Incorrect output. Try again.",
+            });
 
-            // update the score
-            
-            const winRating = match.ratings[username]
-            const loseRating = match.ratings[Object.keys(match.ratings).find(key => key != username)]
-            const winnerUpdate = await axios.put(`${process.env.BACKEND_URI}/user/update-score`, {
-              user_id: parseInt(username),
-              new_score: finalScore(winRating, loseRating, 1)
-            }, {
-              headers: {
-                "x-internal-secret": process.env.INTERNAL_SECRET
-              }
-            })
-
-            const loserUpdate = await axios.put(`${process.env.BACKEND_URI}/user/update-score`, {
-              user_id: parseInt(loserUsername),
-              new_score: finalScore(loseRating, winRating, 0)
-            }, {
-              headers: {
-                "x-internal-secret": process.env.INTERNAL_SECRET
-              }
-            })
-
-            if(loserUpdate.status === 200 && winnerUpdate.status === 200) {
-              console.log("Scores updated successfully")
-              activeMatches.delete(roomId);
+            console.log(match.isAutoSubmit);
+            if (!match.isAutoSubmit[username]) {
+              match.approved[username] = false;
+              match.isAutoSubmit[username] = false;
+              match.submitted[username] = false;
             }
-          } else {
-            console.log("Winner: ", winnerSocketId),
-              io.to(winnerSocketId).emit("solution-feedback", {
-                passed: false,
-                message: "Incorrect output. Try again.",
-              });
           }
         } catch (err) {
-          console.log(err)
-          const fallbackSocketId = match?.players?.[username];
-          if (fallbackSocketId) {
-            io.to(fallbackSocketId).emit("solution-feedback", {
-              passed: false,
-              message: "Execution failed.",
-            });
-          }
+          console.error("Submission error:", err.message);
+          io.to(socket.id).emit("solution-feedback", {
+            passed: false,
+            message: "Server error while executing code.",
+          });
         }
       }
     );
 
     socket.on("disconnect", () => {
-      const index = queue.findIndex((q) => q.socketId === socket.id);
-      if (index !== -1) queue.splice(index, 1);
+      const i = queue.findIndex((q) => q.socketId === socket.id);
+      if (i !== -1) queue.splice(i, 1);
+
       for (const [roomId, match] of activeMatches.entries()) {
-        const usernames = Object.keys(match.players);
-        for (const user of usernames) {
-          if (match.players[user] === socket.id) {
-            io.to(roomId).emit("match-ended", {
-              result: "cancelled",
-              message: `${user} disconnected. Match cancelled.`,
-            });
-            activeMatches.delete(roomId);
-            break;
-          }
+        const user = Object.keys(match.players).find(
+          (u) => match.players[u] === socket.id
+        );
+        if (user) {
+          io.to(roomId).emit("match-ended", {
+            result: "cancelled",
+            message: "Opponent disconnected. Match cancelled.",
+          });
+          activeMatches.delete(roomId);
+          break;
         }
       }
     });
   });
-}
+};
 
 module.exports = { initializeSocket };

@@ -56,7 +56,8 @@ router.post("/store-match", async (req, res) => {
       })
     }
     const { room_id, problem_id, player1_id, player2_id, winner } = req.body;
-    if (!room_id || !problem_id || !player1_id || !player2_id || !winner) {
+    console.log(req.body);
+    if (!room_id || !problem_id || !player1_id || !player2_id) {
       return res.status(400).json({
         error: "Incomplete details",
       });
@@ -72,6 +73,7 @@ router.post("/store-match", async (req, res) => {
 
     res.status(200).json(problem);
   } catch (err) {
+    console.log(err.message);
     res.status(500).json({
       error: "Internal Server Error"
     })

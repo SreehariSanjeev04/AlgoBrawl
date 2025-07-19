@@ -160,7 +160,7 @@ router.put("/update-score", async (req, res) => {
   }
 
   const { user_id, new_score } = req.body;
-
+  console.log(req.body)
   if (
     typeof user_id !== "number" ||
     typeof new_score !== "number" ||
@@ -180,7 +180,7 @@ router.put("/update-score", async (req, res) => {
 
     return res.json({ message: "User score updated successfully", user });
   } catch (err) {
-    console.error(err);
+    console.error("Error updating user score:", err.message);
     return res.status(500).json({ error: "Server error" });
   }
 });
