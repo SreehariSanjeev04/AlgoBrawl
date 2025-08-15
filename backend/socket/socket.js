@@ -1,11 +1,28 @@
 const crypto = require("crypto");
 const queue = [];
 const activeMatches = new Map();
+const activeUsers = new Map();
 const axios = require("axios");
 require("dotenv").config();
 
 const BACKEND = process.env.BACKEND_URI;
 const SECRET = process.env.INTERNAL_SECRET;
+
+const updateUser = async (id, rating, matches_played, wins) => {
+  try {
+    const response = await axios.patch(`${BACKEND}/user/update`, {
+      id,
+      rating,
+      matches_played,
+      wins
+    });
+    console.log("User updated successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating user:", error.message);
+    return { error: "Failed to update user" };
+  }
+};
 
 const eloRating = (Ra, Rb) => 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
 const finalScore = (Ra, Rb, Sa) => Ra + 50 * (Sa - eloRating(Ra, Rb));
@@ -49,23 +66,12 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
         finalScore(match.ratings[p2], match.ratings[p1], 0.5)
       );
 
-      await axios.put(
-        `${BACKEND}/user/update-score`,
-        {
-          user_id: parseInt(p1),
-          new_score: newScore1,
-        },
-        { headers: { "x-internal-secret": SECRET } }
-      );
+      console.log("New score for player1: ", newScore1);
+      console.log("New score for player2: ", newScore2);
 
-      await axios.put(
-        `${BACKEND}/user/update-score`,
-        {
-          user_id: parseInt(p2),
-          new_score: newScore2,
-        },
-        { headers: { "x-internal-secret": SECRET } }
-      );
+      await updateUser(parseInt(p1), newScore1, match.players[p1].matches_played + 1, match.players[p1].wins);
+      await updateUser(parseInt(p2), newScore2, match.players[p2].matches_played + 1, match.players[p2].wins);
+
     } else {
       const winnerSocket = match.players[winner];
       const loserSocket = match.players[loser];
@@ -83,23 +89,28 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
       const winRating = match.ratings[winner];
       const loseRating = match.ratings[loser];
 
-      await axios.put(
-        `${BACKEND}/user/update-score`,
-        {
-          user_id: parseInt(winner),
-          new_score: Math.floor(finalScore(winRating, loseRating, 1)),
-        },
-        { headers: { "x-internal-secret": SECRET } }
-      );
+      // await axios.put(
+      //   `${BACKEND}/user/update-score`,
+      //   {
+      //     user_id: parseInt(winner),
+      //     new_score: Math.floor(finalScore(winRating, loseRating, 1)),
+      //   },
+      //   { headers: { "x-internal-secret": SECRET } }
+      // );
 
-      await axios.put(
-        `${BACKEND}/user/update-score`,
-        {
-          user_id: parseInt(loser),
-          new_score: Math.floor(finalScore(loseRating, winRating, 0)),
-        },
-        { headers: { "x-internal-secret": SECRET } }
-      );
+      // await axios.put(
+      //   `${BACKEND}/user/update-score`,
+      //   {
+      //     user_id: parseInt(loser),
+      //     new_score: Math.floor(finalScore(loseRating, winRating, 0)),
+      //   },
+      //   { headers: { "x-internal-secret": SECRET } }
+      // );
+
+      const newWinnerScore = Math.floor(finalScore(winRating, loseRating, 1));
+      const newLoserScore = Math.floor(finalScore(loseRating, winRating, 0));
+      await updateUser(parseInt(winner), newWinnerScore, match.players[winner].matches_played + 1, match.players[winner].wins + 1);
+      await updateUser(parseInt(loser), newLoserScore, match.players[loser].matches_played + 1, match.players[loser].wins);
     }
     activeMatches.delete(roomId);
   } catch (err) {
@@ -111,12 +122,29 @@ const initializeSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`${socket.id} connected`);
 
+    socket.on("online", async(user) => {
+      console.log("User online:", user);
+    });
+
     socket.on("join-matchmaking", async (user) => {
       queue.push({ socketId: socket.id, ...user });
 
       if (queue.length >= 2) {
         const player1 = queue.shift();
         const player2 = queue.shift();
+
+        // set active users
+
+        const userId = user.id;
+        const userResponse = await axios.get(`${BACKEND}/user/${userId}`, {
+          headers: {
+            "x-internal-secret": SECRET
+          }
+        });
+
+        const fetchedUser = userResponse.data;
+        activeUsers.set(user.id, ...fetchedUser);
+        console.log(activeMatches[user.id]);
         const roomId = crypto.randomUUID();
 
         try {

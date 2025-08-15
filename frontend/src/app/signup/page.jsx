@@ -9,8 +9,9 @@ const Register = () => {
   });
 
   const handleRegister = async (e) => {
+    console.log(details)
     e.preventDefault();
-    const res = await fetch("http://localhost:5000/api/register", {
+    const res = await fetch("http://localhost:5000/api/user/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -20,7 +21,6 @@ const Register = () => {
       credentials: "include",
     });
 
-    const response = await res.json();
     const data = await res.json();
     if (res.ok) {
       redirect("/login");

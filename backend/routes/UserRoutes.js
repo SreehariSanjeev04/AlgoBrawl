@@ -30,6 +30,33 @@ router.post("/register", async (req, res) => {
   }
 });
 
+router.patch("/update", async (req, res) => {
+  const {id, rating, matches_played, wins} = req.body;
+  if (!id || !rating || !matches_played || !wins) {
+    return res.status(400).json({ error: "Incomplete details to update user" });
+  }
+
+  if(typeof id !== "number" || typeof rating !== "number" || typeof matches_played !== "number" || typeof wins !== "number" || !Number.isInteger(id)) {
+    return res.status(400).json({ error: "Invalid user details" });
+  }
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.rating = rating;
+    user.matches_played = matches_played;
+    user.wins = wins;
+
+    await user.save();
+    res.status(200).json({ message: "User updated successfully", user });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;

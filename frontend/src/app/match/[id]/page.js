@@ -13,7 +13,6 @@ const Match = () => {
     const [problem, setProblem] = useState({});
     const [loading, setLoading] = useState(true);
 
-    // fetch details
 
     useEffect(() => {
         const fetchMatchDetails = async () => {

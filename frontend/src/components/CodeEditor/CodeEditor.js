@@ -34,7 +34,6 @@ const CodeEditor = ({ roomId, problem }) => {
     if (timeLeft <= 0) {
       toast.error("Time's up! Auto-submitting your code.");
       submitCode(true);
-
       return;
     }
 

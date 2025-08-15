@@ -1,15 +1,46 @@
-import React from "react";
+"use client"
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import socket from "./socket/socket";
 
 export default function Home() {
+  const { user, loading, isAuthenticated, logout } = useAuth();
+  const router = useRouter();
+  const handleRedirect = () => {
+    if(!loading) {
+      if(isAuthenticated && user?.id) {
+        router.push("/waiting");
+      } else {
+        router.push("/login");
+      }
+    }
+    return;
+  }
+
+  useEffect(() => {
+    socket.connect();
+    const handleConnect = () => {
+      console.log("Connected to socket server");
+      if(!loading && isAuthenticated && user?.id) {
+        socket.emit("online", user);
+      } 
+    }
+    socket.on("connect", handleConnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.disconnect();
+    };
+  }, [isAuthenticated, loading, user?.id]);
+
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-white font-sans">
-      {/* Header */}
       <header className="flex justify-between items-center px-6 py-4 border-b border-gray-800">
         <h1 className="text-2xl font-bold text-white">AlgoBrawl</h1>
         <nav className="space-x-6 text-gray-300 text-sm">
-          <Link href="#faq" className="hover:text-white font-semibold">FAQ</Link>
-          <Link href="/login" className="bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2 text-white font-semibold rounded-full hover:opacity-90">Login</Link>
+          {!loading && !isAuthenticated ? <Link href="/login" className="bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2 text-white font-semibold rounded-full hover:opacity-90">Login</Link> : <button onClick={() => logout()} className="bg-gradient-to-r from-red-600 to-orange-600 px-5 py-2 text-white font-semibold rounded-full hover:opacity-90">Logout</button>}
         </nav>
       </header>
 
@@ -20,9 +51,9 @@ export default function Home() {
         <p className="text-gray-400 max-w-2xl mx-auto text-lg mb-10">
           Match up with coders worldwide in real-time. Solve the same challenge. First to finish wins.
         </p>
-        <a href="#matchmaking" className="inline-block bg-gradient-to-r from-green-500 to-teal-500 px-8 py-3 rounded-xl font-semibold text-black hover:opacity-90 transition-all duration-200">
+        <button onClick={() => handleRedirect()} className="inline-block bg-gradient-to-r from-green-500 to-teal-500 px-8 py-3 rounded-xl font-semibold text-black hover:opacity-90 transition-all duration-200">
           Start a Match
-        </a>
+        </button>
       </section>
 
       <section id="features" className="py-16 px-6 bg-[#111111] border-t border-gray-800">
