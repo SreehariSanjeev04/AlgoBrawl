@@ -10,6 +10,7 @@ import { MoonLoader } from "react-spinners";
 export default function MatchWaitingPage() {
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
+  const difficulty = ["Easy", "Medium", "Hard"];
 
 
   useEffect(() => {
@@ -21,12 +22,24 @@ export default function MatchWaitingPage() {
   
   useEffect(() => {
     if (loading || !isAuthenticated || !user?.id) return;
-    console.log("Rating:", user.rating);
+
+    const x = Math.min(1, Math.max(0, (user.rating - 600) / 1400));
+    const p_easy = (1 - x)**2;
+    const p_medium = 2 * x * (1 - x);
+    const p_hard = x**2;
+
+    const randomProbability = Math.random();
+
+    let idx = 0;
+    if(randomProbability < p_easy) idx = 0;
+    else if(randomProbability < p_easy + p_medium) idx = 1;
+    else idx = 2;
+
     const onConnect = () => {
       console.log("Connected to server with ID:", socket.id);
       socket.emit("join-matchmaking", {
         id: user.id,
-        difficulty: "Easy",
+        difficulty: difficulty[idx],
         rating: user.rating
       });
     };
