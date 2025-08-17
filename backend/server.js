@@ -11,6 +11,7 @@ const httpServer = require("http").createServer(app);
 const { initializeSocket } = require("./socket/socket")
 const matchRouter = require("./routes/MatchRoutes");
 const submissionRouter = require("./routes/SubmissionRoutes")
+const cookieParse = require("cookie-parser")
 
 const io = require("socket.io")(httpServer, {
   cors: {
@@ -21,6 +22,8 @@ const io = require("socket.io")(httpServer, {
 });
 
 app.use(express.json());
+app.use(cookieParse());
+
 app.use(
   cors({
     origin: "http://localhost:3000",

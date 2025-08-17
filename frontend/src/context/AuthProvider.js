@@ -33,8 +33,11 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       try {
         const accessToken = localStorage.getItem("access-token");
+        console.log("Access Token:", accessToken);
         if (!accessToken) {
           logout();
+          setLoading(false);
+          return;
         }
 
         const response = await axios.post(
@@ -59,21 +62,19 @@ export const AuthProvider = ({ children }) => {
             "http://localhost:5000/api/user/refresh-token",
             null,
             {
-              headers: {
-                "authorization": `Bearer ${accessToken}`,
-              },
               withCredentials: true
             }
           );
-
           if (refresh.status === 200) {
             setUser(refresh.data.user);
             setIsAuthenticated(true);
             localStorage.setItem("access-token", refresh.data.accessToken);
           } else {
+            console.log("Refresh token failed, logging out");
             logout();
           }
         } catch (err2) {
+          console.log("Error refreshing token:", err2.message);
           logout();
         }
       } finally {
@@ -82,7 +83,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     authenticate();
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <AuthContext.Provider

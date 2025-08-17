@@ -3,10 +3,13 @@ const queue = [];
 const activeMatches = new Map();
 const activeUsers = new Map();
 const axios = require("axios");
+const BucketQueue = require("../matchmaking/BucketQueue");
 require("dotenv").config();
 
 const BACKEND = process.env.BACKEND_URI;
 const SECRET = process.env.INTERNAL_SECRET;
+
+const bucketQueue = new BucketQueue(600, 2000);
 
 const updateUser = async (id, rating, matches_played, wins) => {
   try {
@@ -14,7 +17,7 @@ const updateUser = async (id, rating, matches_played, wins) => {
       id,
       rating,
       matches_played,
-      wins
+      wins,
     });
     console.log("User updated successfully:", response.data);
     return response.data;
@@ -69,9 +72,18 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
       console.log("New score for player1: ", newScore1);
       console.log("New score for player2: ", newScore2);
 
-      await updateUser(parseInt(p1), newScore1, match.players[p1].matches_played + 1, match.players[p1].wins);
-      await updateUser(parseInt(p2), newScore2, match.players[p2].matches_played + 1, match.players[p2].wins);
-
+      await updateUser(
+        parseInt(p1),
+        newScore1,
+        match.players[p1].matches_played + 1,
+        match.players[p1].wins
+      );
+      await updateUser(
+        parseInt(p2),
+        newScore2,
+        match.players[p2].matches_played + 1,
+        match.players[p2].wins
+      );
     } else {
       const winnerSocket = match.players[winner];
       const loserSocket = match.players[loser];
@@ -109,8 +121,18 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
 
       const newWinnerScore = Math.floor(finalScore(winRating, loseRating, 1));
       const newLoserScore = Math.floor(finalScore(loseRating, winRating, 0));
-      await updateUser(parseInt(winner), newWinnerScore, match.players[winner].matches_played + 1, match.players[winner].wins + 1);
-      await updateUser(parseInt(loser), newLoserScore, match.players[loser].matches_played + 1, match.players[loser].wins);
+      await updateUser(
+        parseInt(winner),
+        newWinnerScore,
+        match.players[winner].matches_played + 1,
+        match.players[winner].wins + 1
+      );
+      await updateUser(
+        parseInt(loser),
+        newLoserScore,
+        match.players[loser].matches_played + 1,
+        match.players[loser].wins
+      );
     }
     activeMatches.delete(roomId);
   } catch (err) {
@@ -122,80 +144,80 @@ const initializeSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`${socket.id} connected`);
 
-    socket.on("online", async(user) => {
+    socket.on("online", async (user) => {
       console.log("User online:", user);
-    });
+    }); // for friends implementation
 
     socket.on("join-matchmaking", async (user) => {
-      queue.push({ socketId: socket.id, ...user });
+      bucketQueue.enqueue(user.rating, user.id, socket.id);
 
-      if (queue.length >= 2) {
-        const player1 = queue.shift();
-        const player2 = queue.shift();
+      if (bucketQueue.hasAtleastTwoPlayers()) {
+        const player1 = bucketQueue.dequeueNextPlayer();
+        const player2 =
+          player1 !== null
+            ? bucketQueue.findOpponentNode(player1.rating)
+            : null;
 
-        // set active users
+        if (player1 !== null && player2 !== null) {
+          console.log("Found two players:", player1, player2);
+          const userId = user.id;
+          const userResponse = await axios.get(`${BACKEND}/user/${userId}`, {
+            headers: {
+              "x-internal-secret": SECRET,
+            },
+          });
 
-        const userId = user.id;
-        const userResponse = await axios.get(`${BACKEND}/user/${userId}`, {
-          headers: {
-            "x-internal-secret": SECRET
-          }
-        });
+          const fetchedUser = userResponse.data;
+          // activeUsers.set(user.id, ...fetchedUser);
+          console.log(activeMatches[user.id]);
+          const roomId = crypto.randomUUID();
 
-        const fetchedUser = userResponse.data;
-        activeUsers.set(user.id, ...fetchedUser);
-        console.log(activeMatches[user.id]);
-        const roomId = crypto.randomUUID();
+          try {
+            const problemRes = await axios.get(
+              `http://localhost:5000/api/problem/generate?difficulty=${user.difficulty}`
+            );
+            const problem = problemRes.data;
 
-        try {
-          const problemRes = await fetch(
-            `http://localhost:5000/api/problem/generate?difficulty=${user.difficulty}`
-          );
-          const problem = await problemRes.json();
-
-          await fetch("http://localhost:5000/api/match/create-match", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            await axios.post("http://localhost:5000/api/match/create-match", {
               roomId,
               players: [player1.id, player2.id],
               problem,
-            }),
-          });
+            });
 
-          activeMatches.set(roomId, {
-            players: {
-              [player1.id]: player1.socketId,
-              [player2.id]: player2.socketId,
-            },
-            ratings: {
-              [player1.id]: player1.rating,
-              [player2.id]: player2.rating,
-            },
-            problemId: problem.id,
-            winner: null,
-            submitted: {
-              [player1.id]: false,
-              [player2.id]: false,
-            },
-            isAutoSubmit: {
-              [player1.id]: false,
-              [player2.id]: false,
-            },
-            approved: {
-              [player1.id]: false,
-              [player2.id]: false,
-            },
-          });
+            activeMatches.set(roomId, {
+              players: {
+                [player1.id]: player1.socketId,
+                [player2.id]: player2.socketId,
+              },
+              ratings: {
+                [player1.id]: player1.rating,
+                [player2.id]: player2.rating,
+              },
+              problemId: problem.id,
+              winner: null,
+              submitted: {
+                [player1.id]: false,
+                [player2.id]: false,
+              },
+              isAutoSubmit: {
+                [player1.id]: false,
+                [player2.id]: false,
+              },
+              approved: {
+                [player1.id]: false,
+                [player2.id]: false,
+              },
+            });
 
-          [player1, player2].forEach(({ socketId }) => {
-            const playerSocket = io.sockets.sockets.get(socketId);
-            playerSocket?.join(roomId);
-          });
+            [player1, player2].forEach(({ socketId }) => {
+              const playerSocket = io.sockets.sockets.get(socketId);
+              playerSocket?.join(roomId);
+            });
 
-          io.to(roomId).emit("match-started", { roomId });
-        } catch (err) {
-          console.error("Matchmaking failed:", err.message);
+            io.to(roomId).emit("match-started", { roomId });
+          } catch (err) {
+            console.error("Matchmaking failed:", err.message);
+          }
         }
       }
     });

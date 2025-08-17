@@ -78,7 +78,7 @@ router.post("/login", async (req, res) => {
       { username, id: user.id, rating: user.rating },
       process.env.JWT_SECRET,
       {
-        expiresIn: "15m",
+        expiresIn: "10s", // 1 minute
       }
     );
 
@@ -90,7 +90,7 @@ router.post("/login", async (req, res) => {
       }
     );
 
-    res.cookie("refresh-token", refreshToken, COOKIE_OPTIONS);
+    res.cookie("refresh_token", refreshToken, COOKIE_OPTIONS);
     return res.status(200).json({ user, accessToken });
   } catch (err) {
     console.error(err);
@@ -151,36 +151,30 @@ router.post("/validate", async (req, res) => {
 router.post("/refresh-token", async (req, res) => {
   try {
     const refresh_token = req.cookies.refresh_token;
-    const authHeader = req.headers["authorization"];
-
-    const access_token = authHeader.split(" ")[1];
-
-    if (!access_token || !refresh_token) {
-      return res.status(401).json({
-        error: "Kindly login again",
-      });
+    console.log("Refresh token:", refresh_token);
+    if(!refresh_token) {
+      return res.status(401).json({ error: "Kindly login again" });
     }
 
-    const playload = jwt.verify(access_token, process.env.JWT_SECRET);
-
-    const newAccessToken = jwt.sign(
-      {
-        id: playload.id,
-        username: playload.username,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "15m",
+    jwt.verify(refresh_token, process.env.REFRESH_TOKEN, (err, payload) => {
+      if(err) {
+        return res.status(401).json({ error: "Kindly login again" });
       }
-    );
 
-    res.status(200).json({
-      accessToken: newAccessToken,
-      user: {
-        username: playload.username,
-      },
+      const newAccessToken = jwt.sign({id: payload.id, username: payload.username, rating: payload.rating}, process.env.JWT_SECRET, {
+        expiresIn: "15m",
+      });
+
+      res.status(200).json({
+        accessToken: newAccessToken,
+        user: {
+          username: payload.username,
+        },
+      });
     });
-  } catch (err) {}
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.put("/update-score", async (req, res) => {
