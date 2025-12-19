@@ -1,5 +1,5 @@
-const {DataTypes} = require('sequelize');
-const sequelize = require('../database/db');
+import { DataTypes } from "sequelize";
+import sequelize from "../database/db.js";
 
 const Match = sequelize.define("Match", {
     id: {
@@ -25,8 +25,10 @@ const Match = sequelize.define("Match", {
     },
     winner: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true // winner must be null initially
     }
 })
 
-module.exports = Match
+
+
+export default Match

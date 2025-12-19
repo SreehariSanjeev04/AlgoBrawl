@@ -23,6 +23,7 @@ export default function MatchWaitingPage() {
   useEffect(() => {
     if (loading || !isAuthenticated || !user?.id) return;
 
+    // Determine difficulty based on user rating
     const x = Math.min(1, Math.max(0, (user.rating - 600) / 1400));
     const p_easy = (1 - x)**2;
     const p_medium = 2 * x * (1 - x);

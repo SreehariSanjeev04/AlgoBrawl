@@ -1,4 +1,4 @@
-const Queue = require("./Queue")
+import Queue from "./Queue.js";
 class BucketQueue {
   constructor(start, end) {
     this.start = start;
@@ -67,6 +67,5 @@ class BucketQueue {
     return this.nodeMap.size >= 2;
   }
 }
-
-module.exports = BucketQueue;
+export default BucketQueue;
 

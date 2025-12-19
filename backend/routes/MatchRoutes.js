@@ -1,7 +1,8 @@
+import express from "express";
 const Matches = new Map();
-const router = require("express").Router();
-const Match = require("../models/Match");
-const auth = require("../middleware/auth")
+const router = express.Router();
+import Match from "../models/Match.js";
+import auth from "../middleware/auth.js";
 
 router.post("/create-match", async (req, res) => {
   const { roomId, players, problem } = req.body;
@@ -79,4 +80,4 @@ router.post("/store-match", async (req, res) => {
     })
   }
 });
-module.exports = router;
+export default router;

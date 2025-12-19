@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { CgProfile } from "react-icons/cg";
 import socket from "./socket/socket";
 
 export default function Home() {
@@ -39,7 +40,8 @@ export default function Home() {
     <div className="min-h-screen bg-[#0f0f0f] text-white font-sans">
       <header className="flex justify-between items-center px-6 py-4 border-b border-gray-800">
         <h1 className="text-2xl font-bold text-white">AlgoBrawl</h1>
-        <nav className="space-x-6 text-gray-300 text-sm">
+        <nav className="space-x-6 flex flex-row justify-around items-center text-gray-300 text-sm">
+          {!loading && isAuthenticated ? <Link href="/dashboard"><CgProfile size={36} color="white" /></Link> : null}
           {!loading && !isAuthenticated ? <Link href="/login" className="bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2 text-white font-semibold rounded-full hover:opacity-90">Login</Link> : <button onClick={() => logout()} className="bg-gradient-to-r from-red-600 to-orange-600 px-5 py-2 text-white font-semibold rounded-full hover:opacity-90">Logout</button>}
         </nav>
       </header>

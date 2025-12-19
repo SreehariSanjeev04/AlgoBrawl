@@ -1,5 +1,6 @@
-const Submission = require("../models/Submission");
-const router = require("express").Router();
+import Submission from "../models/Submission.js";
+import express from "express";
+const router = express.Router();
 
 router.post("/add", async (req, res) => {
   const secret = req.headers["x-internal-secret"];
@@ -34,4 +35,4 @@ router.post("/add", async (req, res) => {
   }
 });
 
-module.exports = router
+export default router

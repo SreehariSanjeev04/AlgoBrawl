@@ -1,5 +1,5 @@
-const {DataTypes} = require("sequelize")
-const sequelize = require('../database/db')
+import { DataTypes } from "sequelize";
+import sequelize from '../database/db.js';
 
 const Submission = sequelize.define("Submission", {
     id: {
@@ -29,4 +29,4 @@ const Submission = sequelize.define("Submission", {
     }
 })
 
-module.exports = Submission
+export default Submission

@@ -1,19 +1,22 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-dotenv.config();
+import express, { json } from "express";
+import cors from "cors";
+import { config } from "dotenv";
+config();
 const app = express();
-const execRouter = require("./executor/executor");
-const sequelize = require("./database/db");
-const userRouter = require("./routes/UserRoutes");
-const problemRouter = require("./routes/ProblemRoutes");
-const httpServer = require("http").createServer(app);
-const { initializeSocket } = require("./socket/socket")
-const matchRouter = require("./routes/MatchRoutes");
-const submissionRouter = require("./routes/SubmissionRoutes")
-const cookieParse = require("cookie-parser")
+import execRouter from "./executor/executor.js";
+import sequelize from "./database/db.js";
+import userRouter from "./routes/UserRoutes.js";
+import problemRouter from "./routes/ProblemRoutes.js";
+import http from "http";
+import initializeSocket from "./socket/socket.js";
+import matchRouter from "./routes/MatchRoutes.js";
+import submissionRouter from "./routes/SubmissionRoutes.js";
+import cookieParser from "cookie-parser";
+import { Server as SocketIOServer } from "socket.io";
 
-const io = require("socket.io")(httpServer, {
+const httpServer = http.createServer(app);
+
+const io = new SocketIOServer(httpServer, {
   cors: {
     origin: "http://localhost:3000",
     methods: ["GET", "POST"],
@@ -21,8 +24,8 @@ const io = require("socket.io")(httpServer, {
   },
 });
 
-app.use(express.json());
-app.use(cookieParse());
+app.use(json());
+app.use(cookieParser());
 
 app.use(
   cors({
@@ -40,8 +43,7 @@ initializeSocket(io)
 const PORT = process.env.PORT || 3000;
 const server = () => {
   try {
-    sequelize
-      .sync({ alter: true })
+    sequelize.sync({ alter: true })
       .then(() => {
         console.log("Database synced");
 

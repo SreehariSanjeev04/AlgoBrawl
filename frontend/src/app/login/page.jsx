@@ -67,14 +67,14 @@ const Login = () => {
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="block text-gray-400 font-semibold mb-2"
             >
-              Email Address
+              Username
             </label>
             <input
               id="username"
-              type="email"
+              type="text"
               value={details.username}
               onChange={handleChange}
               required

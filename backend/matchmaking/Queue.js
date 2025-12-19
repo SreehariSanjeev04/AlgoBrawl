@@ -59,4 +59,4 @@ class Queue {
         return count;
     }
 }
-module.exports = Queue;
+export default Queue;

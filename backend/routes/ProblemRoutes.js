@@ -1,6 +1,7 @@
-const { where } = require("sequelize");
-const Problem = require("../models/Problem");
-const router = require("express").Router();
+import { where } from "sequelize";
+import Problem from "../models/Problem.js";
+import express from "express";
+const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
@@ -44,4 +45,4 @@ router.post("/add", async (req, res) => {
   }
 });
 
-module.exports = router
+export default router

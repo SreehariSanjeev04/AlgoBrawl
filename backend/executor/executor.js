@@ -1,9 +1,10 @@
-const express = require("express");
-const router = express.Router();
-const fs = require("fs");
-const { exec } = require("child_process");
-const path = require("path");
-const { io } = require("../server")
+import { Router } from "express";
+const router = Router();
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { exec } from "child_process";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
 
 const MAX_CONTAINERS = process.env.MAX_CONTAINERS || 5;
 let containers = 0;
@@ -21,8 +22,10 @@ const LANGUAGE_CONFIG = {
   },
 };
 
-const TEMP_DIR = path.join(__dirname, "temp");
-if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const TEMP_DIR = join(__dirname, "temp");
+if (!existsSync(TEMP_DIR)) mkdirSync(TEMP_DIR);
 
 router.post("/run", async (req, res) => {
   if (containers >= MAX_CONTAINERS) {
@@ -39,21 +42,21 @@ router.post("/run", async (req, res) => {
 
   const timestamp = Date.now();
   const filename = `${timestamp}_${config.file}`;
-  const filepath = path.join(__dirname, "temp", filename);
+  const filepath = join(__dirname, "temp", filename);
 
   const inputfile = `testcases_${timestamp}.txt`;
-  const inputpath = path.join(__dirname, "temp", inputfile);
+  const inputpath = join(__dirname, "temp", inputfile);
 
   containers++;
   try {
-    fs.writeFileSync(filepath, code);
-    fs.writeFileSync(inputpath, testcases)
+    writeFileSync(filepath, code);
+    writeFileSync(inputpath, testcases)
 
     const command = `timeout -k 5s 5s docker run --rm --memory=100m --cpus=0.5 -v ${filepath}:/code/${config.file} -v ${inputpath}:/code/input.txt ${config.image}`;
     exec(command, (err, stdout, stderr) => {
       containers--;
       [inputpath, filepath].forEach((f) => {
-        if (fs.existsSync(f)) fs.unlinkSync(f);
+        if (existsSync(f)) unlinkSync(f);
       });
       if (err) {
         return res.status(400).json({ output: stderr || "Execution error." });
@@ -63,7 +66,7 @@ router.post("/run", async (req, res) => {
   } catch (err) {
     containers--;
     [inputpath, filepath].forEach((f) => {
-      if (fs.existsSync(f)) fs.unlinkSync(f);
+      if (existsSync(f)) unlinkSync(f);
     });
     console.log(err);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -87,20 +90,20 @@ router.post("/submit", async (req, res) => {
 
   const timestamp = Date.now();
   const filename = `${timestamp}_${config.file}`;
-  const filepath = path.join(TEMP_DIR, filename);
+  const filepath = join(TEMP_DIR, filename);
 
   const testcaseFile = `testcase_${timestamp}.txt`;
-  const testcasePath = path.join(TEMP_DIR, testcaseFile);
+  const testcasePath = join(TEMP_DIR, testcaseFile);
 
   const expectedFile = `expected_${timestamp}.txt`;
-  const expectedPath = path.join(TEMP_DIR, expectedFile);
+  const expectedPath = join(TEMP_DIR, expectedFile);
 
   containers++;
 
   try {
-    fs.writeFileSync(filepath, code);
-    fs.writeFileSync(testcasePath, testcases);
-    fs.writeFileSync(expectedPath, expected);
+    writeFileSync(filepath, code);
+    writeFileSync(testcasePath, testcases);
+    writeFileSync(expectedPath, expected);
 
     const command = `timeout 5 docker run --rm --memory=100m --cpus=0.5 --network=none \
       -v "${filepath}:/code/${config.file}" \
@@ -112,7 +115,7 @@ router.post("/submit", async (req, res) => {
       containers--;
 
       [filepath, testcasePath, expectedPath].forEach((f) => {
-        if (fs.existsSync(f)) fs.unlinkSync(f);
+        if (existsSync(f)) unlinkSync(f);
       });
 
       if (err) {
@@ -123,7 +126,7 @@ router.post("/submit", async (req, res) => {
   } catch (err) {
     containers--;
     [filepath, testcasePath, expectedPath].forEach((f) => {
-      if (fs.existsSync(f)) fs.unlinkSync(f);
+      if (existsSync(f)) unlinkSync(f);
     });
     return res
       .status(500)
@@ -131,4 +134,4 @@ router.post("/submit", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

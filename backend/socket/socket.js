@@ -1,15 +1,16 @@
-const crypto = require("crypto");
+import crypto from "crypto";
 const queue = [];
 const activeMatches = new Map();
 const activeUsers = new Map();
-const axios = require("axios");
-const BucketQueue = require("../matchmaking/BucketQueue");
-require("dotenv").config();
+import axios from "axios";
+import BucketQueue from "../matchmaking/BucketQueue.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const BACKEND = process.env.BACKEND_URI;
 const SECRET = process.env.INTERNAL_SECRET;
 
-const bucketQueue = new BucketQueue(600, 2000);
+const bucketQueue = new BucketQueue(600, 2000); // Rating range from 600 to 2000
 
 const updateUser = async (id, rating, matches_played, wins) => {
   try {
@@ -146,6 +147,7 @@ const initializeSocket = (io) => {
 
     socket.on("online", async (user) => {
       console.log("User online:", user);
+      activeUsers.set(user.id, {...user, socket_id: socket.id}); // added the person to friends list
     }); // for friends implementation
 
     socket.on("join-matchmaking", async (user) => {
@@ -334,4 +336,4 @@ const initializeSocket = (io) => {
   });
 };
 
-module.exports = { initializeSocket };
+export default initializeSocket;

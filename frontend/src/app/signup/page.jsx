@@ -1,5 +1,6 @@
 "use client"
 
+import { redirect } from "next/dist/server/api-utils";
 import React, { useState } from "react";
 
 const Register = () => {
@@ -52,11 +53,11 @@ const Register = () => {
               htmlFor="username"
               className="block text-gray-400 font-semibold mb-2"
             >
-              Email Address
+              Username
             </label>
             <input
               id="username"
-              type="email"
+              type="text"
               required
               value={details.username}
               onChange={handleChange}
@@ -97,7 +98,7 @@ const Register = () => {
             href="/login"
             className="text-pink-500 font-semibold hover:underline"
           >
-            Login
+            Register
           </a>
         </p>
       </div>
