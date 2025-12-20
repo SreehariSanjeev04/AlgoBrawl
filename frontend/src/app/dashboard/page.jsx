@@ -99,10 +99,6 @@ const UserDashboard = () => {
         <ul className="space-y-2 text-gray-300 text-sm">
           {matches.length !== 0 ? (
             matches.map((match, index) => {
-              const player1username =
-                match.player1_id === user.id
-                  ? match.Player1.username
-                  : match.Player2.username;
               const player2_username =
                 match.player1_id === user.id
                   ? match.Player2.username

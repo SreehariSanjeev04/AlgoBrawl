@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Editor } from "@monaco-editor/react";
 import { LANGUAGE_VERSIONS } from "../lang_constants";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ const CodeEditor = ({ roomId, problem }) => {
   const [testcase, setTestcase] = useState("");
   const [expected, setExpected] = useState("");
   const [input, setInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes in seconds
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -29,6 +29,24 @@ const CodeEditor = ({ roomId, problem }) => {
     editorRef.current = editor;
     editor.focus();
   };
+
+  const handleKeyDown = useCallback((e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      console.log("Submitting code...");
+      submitCode(false);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "e") {
+      e.preventDefault();
+      console.log("Running code...");
+      runCode();
+    }
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -48,7 +66,7 @@ const CodeEditor = ({ roomId, problem }) => {
     if (problem?.testcases.length) {
       console.log(problem.testcases);
       const inputStr = problem.testcases.map((t) => t.input).join("\n");
-      let expectedStr = problem.testcases.map((t) => t.expected).join("\n");
+      let expectedStr = problem.testcases.map((t) => t.output).join("\n");
       expectedStr += "\n";
       setInput(inputStr);
       setExpected(expectedStr);
@@ -97,7 +115,7 @@ const CodeEditor = ({ roomId, problem }) => {
         code: value,
         testcases: input,
         expected,
-        isAuto
+        isAuto,
       });
     } catch (err) {
       console.log(err);
@@ -204,7 +222,7 @@ const CodeEditor = ({ roomId, problem }) => {
                   </p>
                   <p>
                     <span className="text-gray-400">Expected:</span>{" "}
-                    {testcase.expected}
+                    {testcase.output}
                   </p>
                 </div>
               ))
