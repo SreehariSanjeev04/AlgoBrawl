@@ -6,12 +6,18 @@ class BucketQueue {
     this.buckets = new Array(end - start + 1).fill().map(() => new Queue());
     this.nodeMap = new Map();
     this.currentBucket = start;
+    this.currentSize = 0;
   }
 
   enqueue(rating, userId, socketId) {
     const bucketIndex = rating - this.start;
     const node = this.buckets[bucketIndex].enqueue(userId, rating, socketId);
     this.nodeMap.set(userId, node);
+    this.currentSize++;
+  }
+  
+  size() {
+    return this.currentSize;
   }
 
   dequeueNextPlayer() {
@@ -24,6 +30,7 @@ class BucketQueue {
 
       if (node) {
         this.nodeMap.delete(node.id);
+        this.currentSize--;
         return node;
       }
       checked++;
@@ -37,10 +44,11 @@ class BucketQueue {
     const bucketIndex = node.rating - this.start;
     this.buckets[bucketIndex].remove(node);
     this.nodeMap.delete(userId);
+    this.currentSize--;
   }
 
   findOpponentNode(rating) {
-    for (let i = 1; i <= 100; i++) {
+    for (let i = 0; i <= 100; i++) {
       const lower =
         rating - i >= this.start
           ? this.buckets[rating - i - this.start].front
@@ -48,6 +56,7 @@ class BucketQueue {
       if (lower) {
         const node = this.buckets[rating - i - this.start].dequeue();
         this.nodeMap.delete(node.id);
+        this.currentSize--;
         return node;
       }
 

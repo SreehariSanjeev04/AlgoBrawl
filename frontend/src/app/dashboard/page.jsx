@@ -56,6 +56,8 @@ const UserDashboard = () => {
       } catch (error) {
         toast.error("Session expired or data fetch failed.");
         console.error(error);
+        logout();
+        redirect("/login");
       }
     };
 
@@ -96,15 +98,21 @@ const UserDashboard = () => {
         <h2 className="text-xl font-semibold mb-4">Recent Matches</h2>
         <ul className="space-y-2 text-gray-300 text-sm">
           {matches.length !== 0 ? (
-            matches.map((match) => {
-              const player2_id =
+            matches.map((match, index) => {
+              const player1username =
                 match.player1_id === user.id
-                  ? match.player2_id
-                  : match.player1_id;
+                  ? match.Player1.username
+                  : match.Player2.username;
+              const player2_username =
+                match.player1_id === user.id
+                  ? match.Player2.username
+                  : match.Player1.username;
               return match.winner === user.id ? (
-                <li>🟢 You won against {player2_id}</li>
+                <li key={index}>🟢 You won against {player2_username}</li>
+              ) : match.winner === null || match.winner === -1 ? (
+                <li key={index}>🟡 Match against {player2_username} was a draw</li>
               ) : (
-                <li>🔴 You lost to {player2_id}</li>
+                <li key={index}>🔴 You lost to {player2_username}</li>
               );
             })
           ) : (

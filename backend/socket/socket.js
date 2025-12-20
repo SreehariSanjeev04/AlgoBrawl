@@ -12,6 +12,19 @@ const SECRET = process.env.INTERNAL_SECRET;
 
 const bucketQueue = new BucketQueue(600, 2000); // Rating range from 600 to 2000
 
+const eloRating = (Ra, Rb) => 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
+
+const finalScore = (Ra, Rb, Sa) => Ra + 50 * (Sa - eloRating(Ra, Rb));
+
+/**
+ * @description Updates user statistics after a match
+ * @param {string} id
+ * @param {number} rating
+ * @param {number} matches_played
+ * @param {number} wins
+ * @returns
+ */
+
 const updateUser = async (id, rating, matches_played, wins) => {
   try {
     const response = await axios.patch(`${BACKEND}/user/update`, {
@@ -28,8 +41,15 @@ const updateUser = async (id, rating, matches_played, wins) => {
   }
 };
 
-const eloRating = (Ra, Rb) => 1 / (1 + Math.pow(10, (Ra - Rb) / 400));
-const finalScore = (Ra, Rb, Sa) => Ra + 50 * (Sa - eloRating(Ra, Rb));
+/**
+ * @description Stores match result and updates player stats
+ * @param {string} roomId
+ * @param {object} match
+ * @param {string} winner
+ * @param {object} io
+ * @param {boolean} isDraw
+ */
+
 const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
   const [p1, p2] = Object.keys(match.players);
   const loser = winner === p1 ? p2 : p1;
@@ -141,25 +161,130 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
   }
 };
 
+/**
+ * @description Generates or fetches a problem based on difficulty
+ * @param {string} difficulty
+ */
+const generateProblemForDifficulty = async (difficulty) => {
+  try {
+    const problemRes = await axios.get(
+      `http://localhost:5000/api/problem/generate?difficulty=${difficulty}`
+    );
+    const problem = problemRes.data;
+    if (!problem) {
+      console.error("No problem received from problem generator");
+      return null;
+    }
+    return problem;
+  } catch (err) {
+    console.error("Error generating problem: ", err.message);
+    return null;
+  }
+};
+
+/**
+ * @description Creates a match entry in the system
+ * @param {string} roomId
+ * @param {integer} player1_id
+ * @param {integer} player2_id
+ * @param {object} problem
+ * @param {object} io
+ */
+const createMatch = async (
+  roomId,
+  player1,
+  player2,
+  difficulty,
+  io
+) => {
+  const problem = await generateProblemForDifficulty(difficulty);
+  if (problem === null) {
+    return { error: "Failed to generate problem for match", success: false };
+  }
+  try {
+    const roomDetails = {
+      roomId,
+      players: [player1.id, player2.id],
+      problem,
+    };
+
+    console.log("Creating match with details:", roomDetails);
+
+    await axios.post(
+      "http://localhost:5000/api/match/create-match",
+      roomDetails
+    );
+
+    activeMatches.set(roomId, {
+      // players, ratings, problemId, winner, submitted, isAutoSubmit, approved
+      players: {
+        [player1.id]: player1.socketId,
+        [player2.id]: player2.socketId,
+      },
+      ratings: {
+        [player1.id]: player1.rating,
+        [player2.id]: player2.rating,
+      },
+      problemId: problem.id,
+      winner: null,
+      submitted: {
+        [player1.id]: false,
+        [player2.id]: false,
+      },
+      isAutoSubmit: {
+        [player1.id]: false,
+        [player2.id]: false,
+      },
+      approved: {
+        [player1.id]: false,
+        [player2.id]: false,
+      },
+    });
+
+    [player1, player2].forEach(({ socketId }) => {
+      const playerSocket = io.sockets.sockets.get(socketId);
+      playerSocket?.join(roomId); // acknowledge method is not working always, so using the socket technique
+    });
+
+    io.to(roomId).emit("match-started", { roomId });
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating match:", error.message);
+    return { error: "Failed to create match", success: false };
+  }
+};
+
+/**
+ * @description Initializes socket.io server and handles events
+ * @param {object} io
+ */
+
 const initializeSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`${socket.id} connected`);
 
     socket.on("online", async (user) => {
       console.log("User online:", user);
-      activeUsers.set(user.id, {...user, socket_id: socket.id}); // added the person to friends list
+      activeUsers.set(user.id, { ...user, socket_id: socket.id }); // added the person to friends list
     }); // for friends implementation
 
+    /**
+     * Matchmaking Logic
+     */
     socket.on("join-matchmaking", async (user) => {
+      console.log("Joining matchmaking:", user);
       bucketQueue.enqueue(user.rating, user.id, socket.id);
+      console.log("Bucket Queue Size:", bucketQueue.size());
 
       if (bucketQueue.hasAtleastTwoPlayers()) {
+        console.log("Attempting to find match...");
         const player1 = bucketQueue.dequeueNextPlayer();
+        console.log("Player 1 dequeued:", player1);
         const player2 =
           player1 !== null
-            ? bucketQueue.findOpponentNode(player1.rating)
+            ? bucketQueue.findOpponentNode(player1.rating) // finding opponent for player 1
             : null;
-
+        console.log("Player 2 dequeued:", player2);
         if (player1 !== null && player2 !== null) {
           console.log("Found two players:", player1, player2);
           const userId = user.id;
@@ -170,56 +295,15 @@ const initializeSocket = (io) => {
           });
 
           const fetchedUser = userResponse.data;
-          // activeUsers.set(user.id, ...fetchedUser);
+
           console.log(activeMatches[user.id]);
           const roomId = crypto.randomUUID();
 
-          try {
-            const problemRes = await axios.get(
-              `http://localhost:5000/api/problem/generate?difficulty=${user.difficulty}`
-            );
-            const problem = problemRes.data;
-
-            await axios.post("http://localhost:5000/api/match/create-match", {
-              roomId,
-              players: [player1.id, player2.id],
-              problem,
-            });
-
-            activeMatches.set(roomId, {
-              players: {
-                [player1.id]: player1.socketId,
-                [player2.id]: player2.socketId,
-              },
-              ratings: {
-                [player1.id]: player1.rating,
-                [player2.id]: player2.rating,
-              },
-              problemId: problem.id,
-              winner: null,
-              submitted: {
-                [player1.id]: false,
-                [player2.id]: false,
-              },
-              isAutoSubmit: {
-                [player1.id]: false,
-                [player2.id]: false,
-              },
-              approved: {
-                [player1.id]: false,
-                [player2.id]: false,
-              },
-            });
-
-            [player1, player2].forEach(({ socketId }) => {
-              const playerSocket = io.sockets.sockets.get(socketId);
-              playerSocket?.join(roomId);
-            });
-
-            io.to(roomId).emit("match-started", { roomId });
-          } catch (err) {
-            console.error("Matchmaking failed:", err.message);
+          const matchResult = await createMatch(roomId, player1, player2, "Easy", io);
+          if(!matchResult.success) {
+            console.error("Match creation failed:", matchResult.error);
           }
+          console.log("Match created with Room ID:", roomId); 
         }
       }
     });
