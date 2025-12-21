@@ -7,6 +7,7 @@ import BucketQueue from "../matchmaking/BucketQueue.js";
 import dotenv from "dotenv";
 dotenv.config();
 
+// code and logic cleanup required fr 
 const BACKEND = process.env.BACKEND_URI;
 const SECRET = process.env.INTERNAL_SECRET;
 
@@ -62,7 +63,7 @@ const storeMatchResult = async (roomId, match, winner, io, isDraw) => {
         problem_id: match.problemId,
         player1_id: parseInt(p1),
         player2_id: parseInt(p2),
-        winner: isDraw ? -1 : winner,
+        winner: isDraw ? null : winner,
       },
       {
         headers: { "x-internal-secret": SECRET },
@@ -183,6 +184,26 @@ const generateProblemForDifficulty = async (difficulty) => {
 };
 
 /**
+ * @description Transmits remaining match time to players
+ * @param {object} io
+ * @param {string} roomId
+ */
+
+const transmitTime = (io, roomId) => {
+  let duration = activeMatches.get(roomId).duration;
+  console.log("Starting time transmission for room:", roomId);
+  setInterval(() => {
+    if (duration > 0) {
+      io.to(roomId).emit("match-time", { duration });
+      duration--;
+    } else {
+      io.to(roomId).emit("time-up", {});
+      clearInterval();
+    }
+  }, 1000);
+};
+
+/**
  * @description Creates a match entry in the system
  * @param {string} roomId
  * @param {integer} player1_id
@@ -190,13 +211,7 @@ const generateProblemForDifficulty = async (difficulty) => {
  * @param {object} problem
  * @param {object} io
  */
-const createMatch = async (
-  roomId,
-  player1,
-  player2,
-  difficulty,
-  io
-) => {
+const createMatch = async (roomId, player1, player2, difficulty, io) => {
   const problem = await generateProblemForDifficulty(difficulty);
   if (problem === null) {
     return { error: "Failed to generate problem for match", success: false };
@@ -239,6 +254,7 @@ const createMatch = async (
         [player1.id]: false,
         [player2.id]: false,
       },
+      duration: 15 * 60, // 15 minutes in seconds
     });
 
     [player1, player2].forEach(({ socketId }) => {
@@ -279,12 +295,10 @@ const initializeSocket = (io) => {
       if (bucketQueue.hasAtleastTwoPlayers()) {
         console.log("Attempting to find match...");
         const player1 = bucketQueue.dequeueNextPlayer();
-        console.log("Player 1 dequeued:", player1);
         const player2 =
           player1 !== null
             ? bucketQueue.findOpponentNode(player1.rating) // finding opponent for player 1
             : null;
-        console.log("Player 2 dequeued:", player2);
         if (player1 !== null && player2 !== null) {
           console.log("Found two players:", player1, player2);
           const userId = user.id;
@@ -299,14 +313,32 @@ const initializeSocket = (io) => {
           console.log(activeMatches[user.id]);
           const roomId = crypto.randomUUID();
 
-          const matchResult = await createMatch(roomId, player1, player2, "Easy", io);
-          if(!matchResult.success) {
+          const matchResult = await createMatch(
+            roomId,
+            player1,
+            player2,
+            "Easy",
+            io
+          );
+          if (!matchResult.success) {
             console.error("Match creation failed:", matchResult.error);
+          } else {
+            console.log("Match created with Room ID:", roomId);
+            transmitTime(io, roomId);
           }
-          console.log("Match created with Room ID:", roomId); 
         }
       }
     });
+
+    socket.on("leave-matchmaking", (payload, callback) => {
+      console.log("Leaving matchmaking:", payload.id);
+      const res = bucketQueue.remove(payload.id);
+      console.log("Bucket Queue Size:", bucketQueue.size());
+      callback({
+        status: res == true ? "ok" : "error",
+        message: res == true ? "Left matchmaking successfully" : "Error leaving matchmaking",
+      })
+    })
 
     socket.on(
       "submit-solution",
@@ -400,6 +432,7 @@ const initializeSocket = (io) => {
     );
 
     socket.on("disconnect", () => {
+      // add a grace period of 10s before removing the data, make the time static, and let the users connect back to the match gracefully
       const i = queue.findIndex((q) => q.socketId === socket.id);
       if (i !== -1) queue.splice(i, 1);
 

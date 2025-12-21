@@ -1,27 +1,29 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Editor } from "@monaco-editor/react";
-import { LANGUAGE_VERSIONS } from "../lang_constants";
+import dynamic from "next/dynamic";
+const Editor = dynamic(() => import("@monaco-editor/react"),  {ssr: false});
+import { LANGUAGE_VERSIONS } from "@/constants/lang_constants";
 import { toast } from "sonner";
 import socket from "@/app/socket/socket";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import BOILERPLATE from "../Constants/boilerplate";
+import BOILERPLATE from "../../constants/boilerplate";
+import CodeTimer from "../CodeTimer/CodeTimer";
 
 const CodeEditor = ({ roomId, problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
   const editorRef = useRef(null);
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("python");
   const [value, setValue] = useState(BOILERPLATE[language] || "");
   const [outputValue, setOutputValue] = useState("// Output will appear here");
   const [outputError, setOutputError] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [subLoading, setCodeLoading] = useState(false);
   const [testcase, setTestcase] = useState("");
   const [expected, setExpected] = useState("");
   const [input, setInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes in seconds
-  const { user, isAuthenticated } = useAuth();
+  const [timeLeft, setTimeLeft] = useState(Infinity); // 15 minutes in seconds
+  const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
   const currentLanguages = Object.entries(LANGUAGE_VERSIONS);
@@ -43,24 +45,18 @@ const CodeEditor = ({ roomId, problem }) => {
     }
   });
 
+
+  useEffect(() => {
+    if(loading) return;
+    if(!isAuthenticated && !loading) {
+      redirect("/login");
+    }
+  }, [isAuthenticated, loading])
+
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
-
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      toast.error("Time's up! Auto-submitting your code.");
-      submitCode(true);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft]);
 
   useEffect(() => {
     if (problem?.testcases.length) {
@@ -72,14 +68,6 @@ const CodeEditor = ({ roomId, problem }) => {
       setExpected(expectedStr);
     }
   }, [problem]);
-
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  };
 
   useEffect(() => {
     setValue(BOILERPLATE[language] || "");
@@ -94,6 +82,15 @@ const CodeEditor = ({ roomId, problem }) => {
       }, 5000);
     });
 
+    socket.on("time-up", () => { // socket when time is up
+      toast.error("Time's up! Auto-submitting your code.");
+      submitCode(true);
+    })
+
+    socket.on("match-time", ({ duration }) => {
+      setTimeLeft(duration);
+    })
+
     socket.on("solution-feedback", (details) => {
       setOutputError(!details.passed);
       setOutputValue(details.message);
@@ -102,32 +99,43 @@ const CodeEditor = ({ roomId, problem }) => {
     return () => {
       socket.off("match-ended");
       socket.off("solution-feedback");
+      socket.off("time-up");
+      socket.off("solution-feedback");
     };
   }, []);
 
   const submitCode = async (isAuto) => {
-    setLoading(true);
+    setCodeLoading(true);
+    const payload = {
+      roomId,
+      username: user?.id,
+      language,
+      code: value,
+      testcases: input,
+      expected,
+      isAuto,
+    }
     try {
-      socket.emit("submit-solution", {
-        roomId,
-        username: user?.id,
-        language,
-        code: value,
-        testcases: input,
-        expected,
-        isAuto,
+      socket.emit("submit-solution", payload, (response) => {
+        if (response.status === "ok") {
+          console.log("Submission received");
+          toast.success("Code submitted successfully!");
+        } else {
+          console.log("Submission error:", response.message);
+          toast.error(`Submission failed, try again!`);
+        }
       });
     } catch (err) {
       console.log(err);
       setOutputError(true);
       setOutputValue(err.message || "Could not connect to backend");
     } finally {
-      setLoading(false);
+      setCodeLoading(false);
     }
   };
 
   const runCode = async () => {
-    setLoading(true);
+    setCodeLoading(true);
     try {
       const res = await fetch(`${BACKEND_URI}/run`, {
         method: "POST",
@@ -150,7 +158,7 @@ const CodeEditor = ({ roomId, problem }) => {
       setOutputError(true);
       setOutputValue("Error connecting to backend.");
     } finally {
-      setLoading(false);
+      setCodeLoading(false);
     }
   };
 
@@ -177,26 +185,24 @@ const CodeEditor = ({ roomId, problem }) => {
 
         <button
           onClick={runCode}
-          disabled={loading}
+          disabled={subLoading}
+          onMouseOver={() => {}}
           className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
-            loading ? "opacity-60 cursor-not-allowed" : ""
+            subLoading ? "opacity-60 cursor-not-allowed" : ""
           }`}
         >
-          {loading ? "Running..." : "Run"}
+          {subLoading ? "Running..." : "Run"}
         </button>
         <button
           onClick={() => submitCode(false)}
-          disabled={loading}
+          disabled={subLoading}
           className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
-            loading ? "opacity-60 cursor-not-allowed" : ""
+            subLoading ? "opacity-60 cursor-not-allowed" : ""
           }`}
         >
-          {loading ? "Submitting" : "Submit"}
+          {subLoading ? "Submitting" : "Submit"}
         </button>
-
-        <div className="ml-auto text-white text-sm font-mono bg-gray-700 px-3 py-1 rounded">
-          Time Left: {formatTime(timeLeft)}
-        </div>
+        <CodeTimer duration={timeLeft} />
       </div>
 
       <div className="flex-1 grid grid-cols-12 gap-4 p-4">

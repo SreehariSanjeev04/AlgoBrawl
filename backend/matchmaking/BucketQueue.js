@@ -10,10 +10,15 @@ class BucketQueue {
   }
 
   enqueue(rating, userId, socketId) {
+    const modUserId = String(userId);
+    if (this.nodeMap.has(modUserId)) {
+      return;
+    }
     const bucketIndex = rating - this.start;
     const node = this.buckets[bucketIndex].enqueue(userId, rating, socketId);
-    this.nodeMap.set(userId, node);
+    this.nodeMap.set(modUserId, node);
     this.currentSize++;
+    console.log(this.nodeMap);
   }
   
   size() {
@@ -39,12 +44,16 @@ class BucketQueue {
   }
 
   remove(userId) {
-    if (!this.nodeMap.has(userId)) return;
-    const node = this.nodeMap.get(userId);
+    const modUserId = String(userId);
+    if (!this.nodeMap.has(modUserId)) {
+      return false;
+    }
+    const node = this.nodeMap.get(modUserId);
     const bucketIndex = node.rating - this.start;
     this.buckets[bucketIndex].remove(node);
-    this.nodeMap.delete(userId);
+    this.nodeMap.delete(modUserId);
     this.currentSize--;
+    return true;
   }
 
   findOpponentNode(rating) {

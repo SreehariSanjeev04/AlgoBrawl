@@ -54,22 +54,33 @@ export default function MatchWaitingPage() {
 
     const onError = (err) => toast.error(`Socket error: ${err.message}`);
 
-    socket.on("connect", onConnect);
+    if(socket.connected) {
+      console.log("Socket already connected");
+      socket.connect();
+      onConnect();
+    } else {
+      console.log("Connecting socket...");
+    }
     socket.on("match-started", onMatchStarted);
     socket.on("connect_error", onError);
 
-    if (!socket.connected) socket.connect();
 
     return () => {
-      socket.off("connect", onConnect);
       socket.off("match-started", onMatchStarted);
       socket.off("connect_error", onError);
+      socket.off("join-matchmaking", onConnect);
     };
   }, [loading, isAuthenticated, user?.id]);
 
   const handleCancel = () => {
-    socket.emit("leave-matchmaking", { id: user?.id });
-    router.push("/dashboard");
+    socket.emit("leave-matchmaking", { id: user?.id }, (response) => {
+      if(response.status === "ok") {
+        toast.success("Left matchmaking");
+        router.push("/dashboard");
+      } else {
+        toast.error("Error leaving matchmaking");
+      }
+    });
   };
 
   return (
@@ -81,6 +92,7 @@ export default function MatchWaitingPage() {
             </h1>
             <p className="text-sm text-gray-400">Preparing your battle arena...</p>
           </div>
+          <button onClick={handleCancel} className="px-4 py-3 mt-10 bg-red-500 font-semibold text-lg text-white rounded-lg hover:bg-red-600 transition-colors duration-300">Cancel</button>
         </div>  
   );
 }

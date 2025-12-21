@@ -21,7 +21,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    socket.connect();
+    if(!socket.connected) socket.connect();
     const handleConnect = () => {
       console.log("Connected to socket server");
       if(!loading && isAuthenticated && user?.id) {
@@ -32,7 +32,6 @@ export default function Home() {
 
     return () => {
       socket.off("connect", handleConnect);
-      socket.disconnect();
     };
   }, [isAuthenticated, loading, user?.id]);
 
