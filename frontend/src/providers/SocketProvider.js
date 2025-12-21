@@ -1,5 +1,8 @@
+"use client";
+
 import socket from "@/app/socket/socket";
-import { createContext, useEffect } from "react";
+import { createContext, useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const SocketContext = createContext({
   socket: null,
@@ -7,6 +10,7 @@ const SocketContext = createContext({
 });
 
 const SocketProvider = ({ children }) => {
+  const { user, loading, isAuthenticated } = useAuth();
   const [isConnected, setIsConnected] = useState(socket.connected);
 
   const onConnect = () => {
@@ -16,20 +20,22 @@ const SocketProvider = ({ children }) => {
   const onDisconnect = () => {
     console.log("Socket disconnected");
     setIsConnected(false);
-  }
+  };
 
   useEffect(() => {
-    if (!socket.connected) {
+    if (!socket.connected && !loading && isAuthenticated && user?.id) {
       socket.connect();
       console.log("Socket connected from provider");
-    }
+    } else return;
 
     socket.on("connect", onConnect);
+
+    socket.on("disconnect", onDisconnect);
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
     };
-  }, []);
+  }, [loading, isAuthenticated, user]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

@@ -1,10 +1,12 @@
 import crypto from "crypto";
 const queue = [];
-const activeMatches = new Map();
-const activeUsers = new Map();
+const activeMatches = new Map(); // activeMatches -> { userId, socketId, roomId}
+const activeUsers = new Map(); // for friends implementation 
+const pendingConnections = new Map();
 import axios from "axios";
 import BucketQueue from "../matchmaking/BucketQueue.js";
 import dotenv from "dotenv";
+
 dotenv.config();
 
 // code and logic cleanup required fr 
@@ -192,7 +194,7 @@ const generateProblemForDifficulty = async (difficulty) => {
 const transmitTime = (io, roomId) => {
   let duration = activeMatches.get(roomId).duration;
   console.log("Starting time transmission for room:", roomId);
-  setInterval(() => {
+  const _timer = setInterval(() => {
     if (duration > 0) {
       io.to(roomId).emit("match-time", { duration });
       duration--;
@@ -201,6 +203,10 @@ const transmitTime = (io, roomId) => {
       clearInterval();
     }
   }, 1000);
+  
+  const match = activeMatches.get(roomId);
+  if(match) match.timer = _timer;
+  activeMatches.set(roomId, match);
 };
 
 /**
@@ -270,6 +276,28 @@ const createMatch = async (roomId, player1, player2, difficulty, io) => {
   }
 };
 
+const updateUserInformation = (user, socketId) => {
+  if (activeUsers.has(user.id)) {
+    const existingUser = activeUsers.get(user.id);
+    existingUser.socket_id = socketId;
+    activeUsers.set(user.id, existingUser);
+  }
+
+  if(activeUsers.get(user.id).room_id !== null) {
+    console.log(`User ${user.id} reconnected to room ${activeUsers.get(user.id).room_id}`);
+    const playerSocket = io.sockets.sockets.get(socketId);
+    playerSocket?.join(activeUsers.get(user.id).room_id); // rejoin the room 
+
+    const match = activeMatches.get(activeUsers.get(user.id).room_id);
+    if(match) {
+      // update the socket id in the match details as well
+      match.players[user.id] = socketId;
+      activeMatches.set(activeUsers.get(user.id).room_id, match);
+    }
+    transmitTime(io, activeUsers.get(user.id).room_id); // bug in this line of code
+  }
+}
+
 /**
  * @description Initializes socket.io server and handles events
  * @param {object} io
@@ -277,11 +305,18 @@ const createMatch = async (roomId, player1, player2, difficulty, io) => {
 
 const initializeSocket = (io) => {
   io.on("connection", (socket) => {
-    console.log(`${socket.id} connected`);
+    // check if the user is reconnecting within the grace period
 
     socket.on("online", async (user) => {
+      if(pendingConnections.has(user.id)) {
+        clearTimeout(pendingConnections.get(user.id).timeout);
+        pendingConnections.delete(user.id);
+        console.log(`User with ID: ${user.id} reconnected within grace period`);
+        updateUserInformation(user, socket.id);
+        return;
+      }
       console.log("User online:", user);
-      activeUsers.set(user.id, { ...user, socket_id: socket.id }); // added the person to friends list
+      activeUsers.set(user.id, { ...user, socket_id: socket.id, room_id: null }); // added the person to friends list
     }); // for friends implementation
 
     /**
@@ -324,6 +359,7 @@ const initializeSocket = (io) => {
             console.error("Match creation failed:", matchResult.error);
           } else {
             console.log("Match created with Room ID:", roomId);
+            activeMatches.set(roomId, { ...activeMatches.get(roomId), timer: null });
             transmitTime(io, roomId);
           }
         }
@@ -433,20 +469,26 @@ const initializeSocket = (io) => {
 
     socket.on("disconnect", () => {
       // add a grace period of 10s before removing the data, make the time static, and let the users connect back to the match gracefully
-      const i = queue.findIndex((q) => q.socketId === socket.id);
-      if (i !== -1) queue.splice(i, 1);
-
-      for (const [roomId, match] of activeMatches.entries()) {
-        const user = Object.keys(match.players).find(
-          (u) => match.players[u] === socket.id
-        );
-        if (user) {
-          io.to(roomId).emit("match-ended", {
-            result: "cancelled",
-            message: "Opponent disconnected. Match cancelled.",
-          });
-          activeMatches.delete(roomId);
+      console.log(`${socket.id} disconnected`)
+      let userId = null;
+      for( const [id, user] of activeUsers.entries()) {
+        if(user.socketId === socket.id) {
+          userId = id;
           break;
+        }
+      }
+      pendingConnections.set(userId, { timeout: setTimeout(() => {
+        console.log(`Removing user with socket ID: ${socket.id} after grace period`);
+        activeUsers.delete(userId);
+        pendingConnections.delete(userId);
+      }, 10000) }); // 10 seconds grace period
+      // pause the transmit time maybe?
+      const roomId = activeUsers.get(userId)?.room_id;
+      if(roomId) {
+        const match = activeMatches.get(roomId);
+        if(match && match.timer) {
+          clearInterval(match.timer);
+          console.log(`Paused timer for room ${roomId} due to player disconnect`);
         }
       }
     });
@@ -454,3 +496,13 @@ const initializeSocket = (io) => {
 };
 
 export default initializeSocket;
+
+/*
+activeMatches -> Map for active matches with extra details
+  roomId -> { players, ratings, problemId, winner, submitted, isAutoSubmit, approved }
+
+match -> to store match details temporarily
+
+activeUsers -> Map for active users
+  userId -> { id, username, rating, socket_id, room_id }
+*/
