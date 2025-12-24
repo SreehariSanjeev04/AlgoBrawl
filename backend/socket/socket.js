@@ -68,14 +68,14 @@ const initializeSocket = (io) => {
             player2,
             "Easy",
             io,
-            new Map() // Pass activeMatches map
+            MatchManager.activeMatches
           );
 
           if (!matchResult.success) {
             console.error("Match creation failed:", matchResult.error);
           } else {
             console.log("Match created with Room ID:", roomId);
-            transmitTime(io, roomId, new Map()); // Pass activeMatches map
+            transmitTime(io, roomId, MatchManager.activeMatches); // Pass activeMatches map
           }
         }
       }
@@ -130,7 +130,7 @@ const initializeSocket = (io) => {
           const approved = result.output?.includes("Approved");
 
           match.submitted[username] = true;
-          match.approved[username] = approved;
+          // match.approved[username] = approved;
           match.isAutoSubmit[username] = isAuto || false;
 
           await storeSubmission(
@@ -192,8 +192,8 @@ const initializeSocket = (io) => {
 
     socket.on("disconnect", () => {
       const userId = socket.user_id;
-      handleUserDisconnection(userId);
-      pauseMatchOnDisconnect(io, userId);
+      handleUserDisconnection(io, userId);
+      pauseMatchOnDisconnect(userId);
     });
   });
 };

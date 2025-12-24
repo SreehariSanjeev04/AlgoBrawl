@@ -120,6 +120,14 @@ const CodeEditor = ({ roomId, problem }) => {
       setOutputValue(details.message);
     });
 
+    socket.on("player-disconnected", ({ username }) => {
+      toast.error(`Player ${username} has disconnected. Match paused.`);
+    })
+
+    socket.on("match-resumed", ({ username }) => {
+      toast.success(`Player ${username} has reconnected. Match resumed.`);
+    })
+
     return () => {
       socket.off("match-ended");
       socket.off("solution-feedback");

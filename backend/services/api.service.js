@@ -85,7 +85,7 @@ export const ProblemAPI = {
      */
     fetchProblemByDifficulty: async (difficulty) => {
         try {
-            const response = await api.get(`/problem/difficulty/${difficulty}`);
+            const response = await api.get(`/problem/generate/${difficulty}`); // fix
             return response.data;
         } catch(error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -96,5 +96,26 @@ export const ProblemAPI = {
 }
 
 export const MatchAPI = {
-    // implementation required
+    // implementation required 
+    /**
+     * 
+     * @param {string} roomId 
+     * @param {Array<number>} players 
+     * @param {Object} problem 
+     * @returns 
+     */
+    createMatch: async (roomId, players, problem) => {
+        try {
+            const response = await api.post('/match/create-match', {
+                roomId,
+                players,
+                problem
+            });
+            return response.data;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[MatchAPI.createMatch] Error creating match in room ${roomId}:`, errorMessage);
+            return { success: false, error: "Failed to create match" };
+        }
+    }
 }

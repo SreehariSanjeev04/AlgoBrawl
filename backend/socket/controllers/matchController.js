@@ -7,6 +7,7 @@ import { calculateNewRatings } from "../../services/eloService.js";
 import MatchManager from "../../managers/MatchManager.js";
 import dotenv from "dotenv";
 import { error } from "console";
+import ActiveUserManager from "../../managers/ActiveUserManager.js";
 
 dotenv.config();
 
@@ -65,7 +66,7 @@ export const createMatch = async (
 
     console.log("Creating match with details:", roomDetails);
 
-    await axios.post(`${BACKEND}/api/match/create-match`, roomDetails);
+    await MatchAPI.createMatch(roomId, [player1.id, player2.id], problem);
 
     activeMatches.set(roomId, {
       players: {
@@ -94,6 +95,9 @@ export const createMatch = async (
       timer: null,
     });
 
+    ActiveUserManager.updateRoom(player1.id, roomId);
+    ActiveUserManager.updateRoom(player2.id, roomId);
+
     [player1, player2].forEach(({ socketId }) => {
       const playerSocket = io.sockets.sockets.get(socketId);
       playerSocket?.join(roomId);
@@ -102,7 +106,10 @@ export const createMatch = async (
     io.to(roomId).emit("match-started", { roomId });
     return { success: true };
   } catch (error) {
-    console.error("Error creating match:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Error creating match:",
+      error instanceof Error ? error.message : String(error)
+    );
     return { error: "Failed to create match", success: false };
   }
 };

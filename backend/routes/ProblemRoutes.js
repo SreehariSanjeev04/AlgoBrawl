@@ -10,9 +10,9 @@ router.get("/", async (req, res) => {
   } catch (err) {}
 });
 
-router.get("/generate", async (req, res) => {
+router.get("/generate/:difficulty", async (req, res) => {
   try {
-    const { difficulty = "Easy" } = req.query;
+    const { difficulty = "Easy" } = req.params;
 
     const problems = await Problem.findAll({
       where: {
