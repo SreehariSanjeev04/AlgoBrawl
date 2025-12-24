@@ -3,39 +3,57 @@
 import socket from "@/app/socket/socket";
 import { createContext, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
-const SocketContext = createContext({
+export const SocketContext = createContext({
   socket: null,
   isConnected: false,
 });
 
-const SocketProvider = ({ children }) => {
+export const SocketProvider = ({ children }) => {
   const { user, loading, isAuthenticated } = useAuth();
   const [isConnected, setIsConnected] = useState(socket.connected);
 
-  const onConnect = () => {
-    console.log("Socket connected with ID:", socket.id);
-    setIsConnected(true);
-  };
-  const onDisconnect = () => {
-    console.log("Socket disconnected");
-    setIsConnected(false);
-  };
-
   useEffect(() => {
-    if (!socket.connected && !loading && isAuthenticated && user?.id) {
-      socket.connect();
-      console.log("Socket connected from provider");
-    } else return;
 
-    socket.on("connect", onConnect);
+    if (loading || !isAuthenticated || !user?.id) return;
 
-    socket.on("disconnect", onDisconnect);
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
+    const handleConnect = () => {
+      console.log("Socket connected with ID:", socket.id);
+      setIsConnected(true);
+      
+
+      socket.emit("online", {
+        id: user.id,
+        username: user.username,
+        rating: user.rating,
+      });
+      
+      toast.dismiss();
+      toast.success("You are now online!");
     };
-  }, [loading, isAuthenticated, user]);
+
+    const handleDisconnect = () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
+    };
+
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    if (!socket.connected) {
+      socket.connect();
+    } else {
+
+      handleConnect();
+    }
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+    };
+  }, [loading, isAuthenticated, user?.id]); 
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
@@ -43,5 +61,3 @@ const SocketProvider = ({ children }) => {
     </SocketContext.Provider>
   );
 };
-
-export { SocketContext, SocketProvider };

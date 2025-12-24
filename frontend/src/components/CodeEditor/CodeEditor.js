@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 const Editor = dynamic(() => import("@monaco-editor/react"),  {ssr: false});
 import { LANGUAGE_VERSIONS } from "@/constants/lang_constants";
@@ -10,6 +10,8 @@ import { redirect, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import BOILERPLATE from "../../constants/boilerplate";
 import CodeTimer from "../CodeTimer/CodeTimer";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { useSocketEditor } from "@/hooks/useSocketEditor";
 
 const CodeEditor = ({ roomId, problem }) => {
   const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
@@ -27,10 +29,20 @@ const CodeEditor = ({ roomId, problem }) => {
   const router = useRouter();
 
   const currentLanguages = Object.entries(LANGUAGE_VERSIONS);
+  const valueRef = useRef(value);
+
   const onMount = (editor) => {
     editorRef.current = editor;
     editor.focus();
   };
+
+  // auto save the code every 10 seconds
+
+  useAutoSave(`code_${roomId}_${user?.id}`, value);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -72,6 +84,18 @@ const CodeEditor = ({ roomId, problem }) => {
   useEffect(() => {
     setValue(BOILERPLATE[language] || "");
   }, [language]);
+
+  // retrieve saved code from localStorage on mount
+  useEffect(() => {
+    const savedCode = localStorage.getItem(`code_${roomId}_${user?.id}`);
+    if (savedCode) {
+      setValue(savedCode);
+    }
+  }, [roomId, user?.id]);
+
+  useEffect(() => {
+  
+  })
 
   useEffect(() => {
     socket.on("match-ended", (matchData) => {
