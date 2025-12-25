@@ -98,9 +98,10 @@ const CodeEditor = ({ roomId, problem }) => {
   })
 
   useEffect(() => {
-    socket.on("match-ended", (matchData) => {
-      if (matchData.result === "win") toast.success(matchData.message);
-      else toast.error(matchData.message);
+    socket.on("match-ended", ({ winner }) => {
+      console.log("Match ended, winner:", winner);
+      if(winner === user?.id) toast.success("Congratulations! You won the match!");
+      else toast.error("You lost the match. Better luck next time!");
       setInterval(() => {
         router.push("/dashboard");
       }, 5000);

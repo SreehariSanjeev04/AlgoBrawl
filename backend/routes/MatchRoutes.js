@@ -51,11 +51,11 @@ router.get("/remove-match/:matchId", async (req, res) => {
 
 router.post("/store-match", async (req, res) => {
   try {
-    const secret = req.headers["x-internal-secret"]
-    if(!secret) {
+    const secret = req.headers["x-internal-secret"];
+    if (!secret) {
       return res.status(401).json({
-        error: "Secret Invalid"
-      })
+        error: "Secret Invalid",
+      });
     }
     const { room_id, problem_id, player1_id, player2_id, winner } = req.body;
     console.log(req.body);
@@ -65,7 +65,7 @@ router.post("/store-match", async (req, res) => {
       });
     }
 
-    const problem = await Match.create({
+    const res = await Match.create({
       room_id,
       problem_id,
       player1_id,
@@ -73,12 +73,14 @@ router.post("/store-match", async (req, res) => {
       winner,
     });
 
-    res.status(200).json(problem);
+    res.status(200).json({
+      message: "Match stored successfully",
+    });
   } catch (err) {
     console.log(err.message);
     res.status(500).json({
-      error: "Internal Server Error"
-    })
+      error: "Internal Server Error",
+    });
   }
 });
 export default router;

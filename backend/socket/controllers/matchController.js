@@ -154,6 +154,8 @@ export const finalizeMatchEloAndStore = async (
 
   try {
     if (isDraw) {
+      await storeMatch(roomId, match.problemId, p1, p2, null); // storing match details
+
       const { p1New, p2New } = calculateNewRatings(
         match.ratings[p1],
         match.ratings[p2],
@@ -181,10 +183,12 @@ export const finalizeMatchEloAndStore = async (
       }
     } else {
       const loser = winner === p1 ? p2 : p1;
+
+      await storeMatch(roomId, match.problemId, p1, p2, winner); // storing the match details
       const { p1New, p2New } = calculateNewRatings(
         match.ratings[p1],
         match.ratings[p2],
-        winner === p1 ? "win" : "loss"
+        winner === p1 ? "p1" : "p2"
       );
 
       const details_p1 = await UserAPI.fetch(p1);
@@ -214,3 +218,19 @@ export const finalizeMatchEloAndStore = async (
     );
   }
 };
+/**
+ * 
+ * @param {string} room_id 
+ * @param {number} problem_id 
+ * @param {number} player1_id 
+ * @param {number} player2_id 
+ * @param {number|null} winner 
+ */
+const storeMatch = async (room_id, problem_id , player1_id, player2_id, winner) => {
+  try {
+    const res = await MatchAPI.storeMatch(room_id, problem_id, player1_id, player2_id, winner);
+  } catch(error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[MatchController.storeMatch] Error storing match in room ${room_id}:`, errorMessage);
+  }
+}

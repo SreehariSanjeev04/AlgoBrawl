@@ -3,7 +3,7 @@
 import ActiveUserManager from "../../managers/ActiveUserManager.js";
 import MatchManager from "../../managers/MatchManager.js";
 import PendingConnections from "../../managers/PendingConnections.js";
-import { transmitTime } from "./matchController.js";
+import { finalizeMatchEloAndStore, transmitTime } from "./matchController.js";
 
 /**
  * @typedef {Object} User
@@ -57,7 +57,6 @@ export const handleUserReconnection = (io, user, socketId) => {
       if (match.timer) MatchManager.stopTimer(roomId);
       io.to(roomId).emit("match-resumed", { username: user.username });
       transmitTime(io, roomId, MatchManager.activeMatches);
-      // Timer will be restarted by caller
     }
   }
 };
@@ -76,12 +75,37 @@ export const handleUserDisconnection = (io, userId) => {
   console.log(`User ${userId} disconnected`);
 
   const roomId = ActiveUserManager.get(userId)?.room_id;
-  if(roomId) {
-    io.to(roomId).emit("player-disconnected", { username: ActiveUserManager.get(userId)?.username });
+  if (roomId) {
+    io.to(roomId).emit("player-disconnected", {
+      username: ActiveUserManager.get(userId)?.username,
+    });
   }
   PendingConnections.set(userId, {
     timeout: setTimeout(() => {
       console.log(`Removing user ${userId} after grace period`);
+      // the other guy wins if in a match
+      const roomId = ActiveUserManager.get(userId)?.room_id;
+      if (roomId) {
+        const match = MatchManager.get(roomId);
+        if (match) {
+          const winnerId = Object.keys(match.players).find(
+            (id) => userId !== parseInt(id)
+          );
+          console.log("Match: ", match);
+          console.log("WinnerId: ", winnerId);
+          if (winnerId && !match.winner) {
+            match.winner = parseInt(winnerId);
+            finalizeMatchEloAndStore(roomId, match, parseInt(winnerId), false);
+            MatchManager.endMatch(roomId);
+            io.to(roomId).emit("match-ended", { winner: parseInt(winnerId) });
+          } else {
+            MatchManager.endMatch(roomId);
+            if (match.winner) {
+              io.to(roomId).emit("match-ended", { winner: match.winner });
+            }
+          }
+        }
+      }
       ActiveUserManager.remove(userId);
       PendingConnections.remove(userId);
     }, 10000),

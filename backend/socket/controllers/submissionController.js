@@ -11,7 +11,7 @@ const SECRET = process.env.INTERNAL_SECRET;
 /**
  * @typedef {Object} SubmissionPayload
  * @property {string} roomId
- * @property {number} username
+ * @property {number} userId
  * @property {string} code
  * @property {string} language
  * @property {Array<{input: string, output: string}>} testcases
