@@ -141,7 +141,7 @@ const CodeEditor = ({ roomId, problem }) => {
     setCodeLoading(true);
     const payload = {
       roomId,
-      username: user?.id,
+      userId: user?.id,
       language,
       code: value,
       testcases: input,

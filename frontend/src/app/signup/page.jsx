@@ -1,34 +1,46 @@
 "use client"
 
-import { redirect } from "next/dist/server/api-utils";
+import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 const Register = () => {
+  const router = useRouter();
   const [details, setDetails] = useState({
     username: "",
     password: "",
   });
 
   const handleRegister = async (e) => {
-    console.log(details)
-    e.preventDefault();
-    const res = await fetch("http://localhost:5000/api/user/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(details),
-      credentials: "include",
-    });
+  e.preventDefault();
 
-    const data = await res.json();
-    if (res.ok) {
-      redirect("/login");
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/api/user/register",
+      details,
+      {
+        withCredentials: true, 
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (res.status === 200 || res.status === 201) {
+      router.replace("/login");  
     } else {
-      alert(data.error);
+      alert("Registration failed");
     }
-  };
+  } catch (err) {
+    console.error(err);
+
+    if (axios.isAxiosError(err)) {
+      alert(err.response?.data?.error || "Registration failed");
+    } else {
+      alert("Something went wrong");
+    }
+  }
+};
 
   const handleChange = (e) => {
     setDetails(prev => ({
@@ -88,7 +100,7 @@ const Register = () => {
             type="submit"
             className="w-full bg-gradient-to-r from-pink-600 via-purple-700 to-indigo-700 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-600 text-white font-bold py-3 rounded-md shadow-lg transition"
           >
-            Log In
+            Register
           </button>
         </form>
 
@@ -98,7 +110,7 @@ const Register = () => {
             href="/login"
             className="text-pink-500 font-semibold hover:underline"
           >
-            Register
+            Login
           </a>
         </p>
       </div>

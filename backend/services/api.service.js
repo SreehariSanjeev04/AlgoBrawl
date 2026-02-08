@@ -141,7 +141,7 @@ export const MatchAPI = {
    */
   storeMatch: async (room_id, problem_id, player1_id, player2_id, winner) => {
     try {
-      const response = await api.post("match/store-match", {
+      const response = await api.post("/match/store-match", {
         room_id,
         problem_id,
         player1_id,
@@ -171,7 +171,7 @@ export const SubmissionAPI = {
    */
   submitCode: async (language, code, testcases, expected) => {
     try {
-      const res = await axios.post("/submit", {
+      const res = await api.post("/submit", {
         language,
         code,
         testcases,
@@ -189,4 +189,30 @@ export const SubmissionAPI = {
       return null;
     }
   },
+  /**
+   * 
+   * @param {number} userId 
+   * @param {string} matchId 
+   * @param {string} code 
+   * @param {string} language 
+   * @param {string} result 
+   */
+  storeSubmission: async (userId, matchId, code, language, result) => {
+    try {
+      const res = await api.post("/api/submission/add", {
+        user_id: userId,
+        match_id: matchId,
+        code,
+        language,
+        result,
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[SubmissionAPI.storeSubmission] Error storing submission for match ${matchId}:`,
+        errorMessage
+      );
+    }
+  }
 };

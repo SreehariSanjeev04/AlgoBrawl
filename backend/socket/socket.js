@@ -25,7 +25,7 @@ import {
   pauseMatchOnDisconnect,
 } from "./controllers/connectionController.js";
 import { Socket } from "dgram";
-import { SubmissionAPI } from "../services/api.service.js";
+import { MatchAPI, SubmissionAPI } from "../services/api.service.js";
 
 dotenv.config();
 
@@ -98,19 +98,32 @@ const initializeSocket = (io) => {
       });
 
       socket.on(
-        "submit-solution", // have to go over this once again
-        async ({
-          roomId,
-          userId,
-          code,
-          language,
-          testcases,
-          expected,
-          isAuto,
-        }) => {
+        "submit-solution", // requires locks for better processing
+        async (
+          {
+            roomId,
+            userId,
+            code,
+            language,
+            testcases,
+            expected,
+            isAuto, // automatic submission when the timer runs out
+          },
+          callback
+        ) => {
+          callback({
+            // callback to acknowledge receipt of submission
+            status: "ok",
+            message: "Submission received",
+          });
           const match = MatchManager.get(roomId);
           if (!match || match.winner) return;
+          if (match.submitted[userId]) {
+            return; // already submitted, ignore further submissions
+          }
+          match.submitted[userId] = true;
 
+          userId = Number(userId);
           try {
             const result = await SubmissionAPI.submitCode(
               language,
@@ -120,6 +133,7 @@ const initializeSocket = (io) => {
             );
 
             if (!result) {
+              match.submitted[userId] = false;
               socket.emit("solution-feedback", {
                 passed: false,
                 message: "Server error while executing code.",
@@ -127,70 +141,92 @@ const initializeSocket = (io) => {
               return;
             }
 
-            let approved = false;
-
-            if (result.output) {
-              approved = result.passed === true;
-            }
-
-            match.submitted[userId] = true;
+            const approved = result.passed === true;
             match.approved[userId] = approved;
             match.isAutoSubmit[userId] = isAuto || false;
 
-            await storeSubmission(
-              parseInt(userId),
+            await SubmissionAPI.storeSubmission(
+              userId,
               roomId,
               code,
               language,
               approved ? "Approved" : "Not Approved"
             );
 
-            const opponent = Object.keys(match.players).map(Number).find(
-              (u) => u !== userId
-            );
+            const opponent = Object.keys(match.players)
+              .map(Number)
+              .find((u) => u !== userId);
 
-            if (approved && !match.winner) {
-              match.winner = userId;
-              await finalizeMatchEloAndStore(roomId, match, userId, false);
+            if (!opponent) {
+              // go thru this logic
+              io.to(roomId).emit("match-ended", { winner: userId });
+              finalizeMatchEloAndStore(roomId, match, userId, false); // user wins by default, no match stored
+              MatchManager.endMatch(roomId);
               return;
-            }
+            } // solo match, no opponent to compare with
+
+            let finalWinner = null;
+            let shouldMatchEnd = false;
+            let isDraw = false;
 
             const bothSubmitted =
-              match.submitted[userId] &&
-              (opponent ? match.submitted[opponent] : false);
-            const bothAuto =
-              match.isAutoSubmit[userId] && (opponent ? match.isAutoSubmit[opponent] : false);
+              match.submitted[userId] && match.submitted[opponent];
             const bothFailed =
-              !match.approved[userId] && (opponent ? !match.approved[opponent] : false);
-            if (bothSubmitted && !match.winner) {
-              if (opponent && match.approved[opponent]) {
-                match.winner = opponent;
-                await finalizeMatchEloAndStore(roomId, match, opponent, false);
-              } else if (bothAuto && bothFailed) {
-                console.log("Both players failed, ending match as a draw");
-                await finalizeMatchEloAndStore(roomId, match, userId, true);
-              }
-              MatchManager.endMatch(roomId);
-            } else if (!approved) {
-              console.log("Reached here with non-approved submission");
-              io.to(socket.id).emit("solution-feedback", {
-                passed: false,
-                message: "Incorrect output. Try again.",
-              });
+              !match.approved[userId] && !match.approved[opponent];
+            const bothPassed =
+              match.approved[userId] && match.approved[opponent];
 
-              if (!match.isAutoSubmit[userId]) {
-                match.approved[userId] = false;
-                match.isAutoSubmit[userId] = false;
-                match.submitted[userId] = false;
+            if (approved) {
+              if (match.winner) return;
+              finalWinner = userId;
+              match.winner = userId;
+              shouldMatchEnd = true;
+            } else if (isAuto && bothSubmitted) {
+              if (bothPassed || bothFailed) {
+                isDraw = true;
+              } else {
+                finalWinner = match.approved[userId] ? userId : opponent;
+                match.winner = finalWinner;
               }
+              shouldMatchEnd = true;
+            } else if (!isAuto && !approved) {
+              match.submitted[userId] = false;
+              socket.emit("solution-feedback", {
+                passed: false,
+                message: "Solution not approved. Try again.",
+              });
+            }
+
+            if (shouldMatchEnd) {
+              await MatchAPI.storeMatch(
+                roomId,
+                match.problemId,
+                userId,
+                opponent,
+                finalWinner
+              );
+              await finalizeMatchEloAndStore(
+                roomId,
+                match,
+                finalWinner,
+                isDraw
+              );
+
+              io.to(roomId).emit("match-ended", {
+                winner: finalWinner,
+                isDraw,
+              });
+              MatchManager.endMatch(roomId);
             }
           } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error("[Code Submission]Submission error:", errorMessage);
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            console.error("[Code Submission] Submission error:", errorMessage);
             io.to(socket.id).emit("solution-feedback", {
               passed: false,
               message: "Server error while executing code.",
             });
+            match.submitted[userId] = false;
           }
         }
       );

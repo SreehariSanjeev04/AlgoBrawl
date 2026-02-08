@@ -20,21 +20,17 @@ const Login = () => {
   const router = useRouter();
   const handleLogin = async (e) => {
     e.preventDefault();
-    const res = await axios.post(`${BACKEND_URI}/user/login`, details, {
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      withCredentials: true,
-    });
+    try {
+      const res = await axios.post(`${BACKEND_URI}/user/login`, details, {
+        withCredentials: true,
+      });
 
-    const data = res.data;
-    if (res.status !== 200) {
-      toast.error("Login failed");
-    } else {
+      const data = res.data;
       toast.success("Login successful");
       router.replace("/");
       login(data.user, data.accessToken);
+    } catch (err) {
+      toast.error("Login failed: " + (err.response?.data?.error || err.message));
     }
   };
   const handleChange = (e) => {

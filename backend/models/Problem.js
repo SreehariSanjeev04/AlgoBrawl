@@ -24,6 +24,11 @@ const Problem = sequelize.define("Problem", {
         type: DataTypes.ENUM("Easy", "Medium", "Hard"),
         defaultValue: "Easy",
         allowNull: false
+    },
+    judge_type: {
+        type: DataTypes.ENUM("float", "boolean", "string", "ignore_case"),
+        defaultValue: "ignore_case",
+        allowNull: false
     }
 })
 

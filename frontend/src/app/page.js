@@ -23,7 +23,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (isConnected) {
+    if (isAuthenticated && isConnected) {
       socket.emit(
         "online",
         {
@@ -32,13 +32,15 @@ export default function Home() {
           rating: user.rating,
         },
         toast.dismiss(),
-        toast.success("You are now online!")
+        toast.success("You are now online!"),
       );
-    } else {
-      toast.loading("Connecting to server...");
-      return;
+    } else if (isAuthenticated) {
+      {
+        toast.loading("Connecting to server...");
+        return;
+      }
     }
-  }, [isConnected, socket]);
+  }, [isAuthenticated, isConnected, socket]);
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-white font-sans">
       <header className="flex justify-between items-center px-6 py-4 border-b border-gray-800">

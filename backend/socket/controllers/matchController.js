@@ -154,8 +154,7 @@ export const finalizeMatchEloAndStore = async (
 
   try {
     if (isDraw) {
-      await storeMatch(roomId, match.problemId, p1, p2, null); // storing match details
-
+      
       const { p1New, p2New } = calculateNewRatings(
         match.ratings[p1],
         match.ratings[p2],

@@ -7,7 +7,9 @@ router.get("/", async (req, res) => {
   try {
     const problems = await Problem.findAll();
     res.status(200).json(problems);
-  } catch (err) {}
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 router.get("/generate/:difficulty", async (req, res) => {
@@ -17,7 +19,7 @@ router.get("/generate/:difficulty", async (req, res) => {
     const problems = await Problem.findAll({
       where: {
         difficulty,
-      },
+      }, limit: 50,
     });
 
     const randomInt = Math.floor(Math.random() * problems.length);
@@ -31,13 +33,14 @@ router.get("/generate/:difficulty", async (req, res) => {
 
 router.post("/add", async (req, res) => {
   try {
-    const { title, description, difficulty, language, testcases } = req.body;
+    const { title, description, difficulty, language, testcases, judge_type } = req.body;
     const problem = await Problem.create({
       title,
       description,
       difficulty,
       language,
       testcases,
+      judge_type
     });
     res.status(201).json(problem);
   } catch (err) {
@@ -45,4 +48,4 @@ router.post("/add", async (req, res) => {
   }
 });
 
-export default router
+export default router;
