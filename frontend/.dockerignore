@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env*.local
+README.md
+*.md
+.gitignore
+.eslintrc*
+.eslint*
+.prettierrc*
+tsconfig.json
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore
