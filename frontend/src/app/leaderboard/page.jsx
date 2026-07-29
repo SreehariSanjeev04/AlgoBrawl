@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 const LeaderboardPage = () => {
-  const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
   const [leaderboardData, setLeaderboardData] = useState([]);
   const { loading, isAuthenticated, user } = useAuth();
   const router = useRouter()
+  const BACKEND_URI = process.env.NEXT_PUBLIC_BACKEND_URI || "http://localhost:5000/api";
+
   useEffect(() => {
     if (loading) return;
 
@@ -18,15 +20,8 @@ const LeaderboardPage = () => {
     }
     const fetchLeaderboard = async () => {
       try {
-        const response = await fetch(`${BACKEND_URI}/user`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        });
-        const data = await response.json();
-        setLeaderboardData(data);
+        const response = await axios.get(`${BACKEND_URI}/user`)
+        setLeaderboardData(response.data);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
       }

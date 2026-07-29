@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import axios from "axios";
+import { toast } from "sonner";
 
 const Register = () => {
   const router = useRouter();
@@ -29,15 +31,15 @@ const Register = () => {
     if (res.status === 200 || res.status === 201) {
       router.replace("/login");  
     } else {
-      alert("Registration failed");
+      toast.error(res.data.error || "Registration failed");
     }
   } catch (err) {
     console.error(err);
 
     if (axios.isAxiosError(err)) {
-      alert(err.response?.data?.error || "Registration failed");
+      toast.error(err.response?.data?.error || "Registration failed");
     } else {
-      alert("Something went wrong");
+      toast.error("Something went wrong");
     }
   }
 };

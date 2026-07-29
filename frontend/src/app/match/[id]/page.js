@@ -6,6 +6,7 @@ import CodeEditor from '@/components/CodeEditor/CodeEditor'
 import { useParams } from 'next/navigation'
 import { useRouter } from 'next/navigation' 
 import { toast } from 'sonner'
+import axios from 'axios'
 const Match = () => {
     const params = useParams()
     const router = useRouter()
@@ -18,22 +19,10 @@ const Match = () => {
         const fetchMatchDetails = async () => {
             setLoading(true)
             try {
-                const response = await fetch(`http://localhost:5000/api/match/${id}`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json"
-                }
-            });
-            
-            if(!response.ok) {
-                toast.error("Error fetching problem description")
-                router.replace("/")
-            }
-
-            const matchDetails = await response.json()
-
-            setProblem(matchDetails?.room.problem)
+                const BACKEND_URI = process.env.NEXT_PUBLIC_BACKEND_URI || "http://localhost:5000/api"
+                const response = await axios.get(`${BACKEND_URI}/match/${id}`)
+                
+                setProblem(response.data?.room.problem)
             } catch(err) {
                 console.log(err.message)
             } finally {
