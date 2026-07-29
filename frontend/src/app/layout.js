@@ -16,16 +16,25 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "AlgoBrawl",
-  description: "Go code!",
+  description: "Real-time competitive coding platform",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Toaster richColors position="top-right" />
+    <html lang="en" className="dark">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: "#0f1012",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "#e4e4e7",
+              fontSize: "13px",
+              fontFamily: "var(--font-geist-sans)",
+            },
+          }}
+        />
         <AuthProvider>
           <SocketProvider>
             {children}

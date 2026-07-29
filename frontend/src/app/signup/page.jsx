@@ -1,120 +1,111 @@
-"use client"
+"use client";
 
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import Link from "next/link";
 import axios from "axios";
 import { toast } from "sonner";
+import TerminalHeader from "@/components/ui/TerminalHeader";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import { useAuth } from "@/hooks/useAuth";
 
 const Register = () => {
   const router = useRouter();
-  const [details, setDetails] = useState({
-    username: "",
-    password: "",
-  });
+  const { user, logout, isAuthenticated, loading } = useAuth();
+  const [details, setDetails] = useState({ username: "", password: "" });
 
   const handleRegister = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/user/register",
+        details,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
 
-  try {
-    const res = await axios.post(
-      "http://localhost:5000/api/user/register",
-      details,
-      {
-        withCredentials: true, 
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+      if (res.status === 200 || res.status === 201) {
+        toast.success("Registration successful");
+        router.replace("/login");
+      } else {
+        toast.error(res.data.error || "Registration failed");
       }
-    );
-
-    if (res.status === 200 || res.status === 201) {
-      router.replace("/login");  
-    } else {
-      toast.error(res.data.error || "Registration failed");
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.error || "Registration failed");
+      } else {
+        toast.error("Something went wrong");
+      }
     }
-  } catch (err) {
-    console.error(err);
-
-    if (axios.isAxiosError(err)) {
-      toast.error(err.response?.data?.error || "Registration failed");
-    } else {
-      toast.error("Something went wrong");
-    }
-  }
-};
+  };
 
   const handleChange = (e) => {
-    setDetails(prev => ({
-      ...prev,
-      [e.target.id]:e.target.value
-    }))
-  }
+    setDetails((prev) => ({ ...prev, [e.target.id]: e.target.value }));
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <div className="bg-gray-900 bg-opacity-80 backdrop-blur-lg rounded-xl shadow-xl p-10 max-w-md w-full border border-gray-700">
-        <h1 className="text-5xl py-5 font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 mb-8 text-center">
-          AlgoBrawl
-        </h1>
+    <div className="min-h-screen bg-[#08090a]">
+      <TerminalHeader
+        user={user}
+        isAuthenticated={isAuthenticated}
+        loading={loading}
+        onLogout={logout}
+      />
 
-        <h2 className="text-xl font-semibold text-gray-300 mb-6 text-center">
-          Register your account
-        </h2>
+      <div className="relative min-h-[calc(100vh-44px)] flex items-center justify-center px-4">
+        <div className="absolute inset-0 bg-grid pointer-events-none" />
 
-        <form className="space-y-6" onSubmit={handleRegister}>
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-gray-400 font-semibold mb-2"
-            >
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              required
-              value={details.username}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition"
-            />
+        <div className="relative w-full max-w-sm">
+          <div className="text-center mb-8">
+            <h1 className="text-[22px] font-mono font-bold tracking-tight text-zinc-100 mb-1">
+              algobrawl
+            </h1>
+            <p className="text-[12px] font-mono text-zinc-500">
+              Register your account
+            </p>
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-gray-400 font-semibold mb-2"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={details.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition"
-            />
+          <div className="bg-surface-1 border border-[var(--border-default)] rounded-lg p-6">
+            <form onSubmit={handleRegister} className="space-y-4">
+              <Input
+                id="username"
+                label="Username"
+                type="text"
+                value={details.username}
+                onChange={handleChange}
+                placeholder="Choose a username"
+                required
+              />
+
+              <Input
+                id="password"
+                label="Password"
+                type="password"
+                value={details.password}
+                onChange={handleChange}
+                placeholder="Choose a password"
+                required
+              />
+
+              <Button type="submit" variant="primary" size="md" className="w-full">
+                Register
+              </Button>
+            </form>
+
+            <p className="mt-5 text-center text-[12px] text-zinc-500">
+              Already have an account?{" "}
+              <Link href="/login" className="text-accent hover:text-accent-light transition-colors">
+                Log In
+              </Link>
+            </p>
           </div>
-
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-pink-600 via-purple-700 to-indigo-700 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-600 text-white font-bold py-3 rounded-md shadow-lg transition"
-          >
-            Register
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-gray-500">
-          Already have an account?{" "}
-          <a
-            href="/login"
-            className="text-pink-500 font-semibold hover:underline"
-          >
-            Login
-          </a>
-        </p>
+        </div>
       </div>
     </div>
   );

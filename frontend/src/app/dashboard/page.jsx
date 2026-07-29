@@ -3,20 +3,22 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import LoadingScreen from "@/components/LoadingPage/LoadingPage";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
+import TerminalHeader from "@/components/ui/TerminalHeader";
+import Card from "@/components/ui/Card";
+import SectionLabel from "@/components/ui/SectionLabel";
+import StatusDot from "@/components/ui/StatusDot";
+import Button from "@/components/ui/Button";
 
 const UserDashboard = () => {
   const { user, loading, logout, isAuthenticated } = useAuth();
   const [details, setDetails] = useState(null);
   const [matches, setMatches] = useState([]);
-  const router = useRouter();
-
   const [shouldRender, setShouldRender] = useState(false);
-
+  const router = useRouter();
   const BACKEND_URI = process.env.NEXT_PUBLIC_BACKEND_URI;
-  console.log("Backend URI:", BACKEND_URI);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -26,24 +28,17 @@ const UserDashboard = () => {
           axios.get(`${BACKEND_URI}/user/${user.id}`),
           axios.post(
             `${BACKEND_URI}/user/get-matches`,
-            {
-              user_id: user.id,
-            },
-            {
-              withCredentials: true,
-            }
+            { user_id: user.id },
+            { withCredentials: true }
           ),
         ]);
-
-        console.log("Match history fetched:", matchRes.data.matches);
-        console.log("User details fetched:", userRes.data.user);
 
         if (userRes.status === 200) {
           setDetails(userRes.data.user);
         } else {
           toast.error("Failed to fetch user details.");
           logout();
-          redirect("/login");
+          router.replace("/login");
         }
 
         if (matchRes.status === 200) {
@@ -51,13 +46,12 @@ const UserDashboard = () => {
         } else {
           toast.error("Failed to fetch match history.");
           logout();
-          redirect("/login");
+          router.replace("/login");
         }
       } catch (error) {
         toast.error("Session expired or data fetch failed.");
-        console.error(error);
         logout();
-        redirect("/login");
+        router.replace("/login");
       }
     };
 
@@ -76,52 +70,113 @@ const UserDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white px-6 py-8">
-      <h1 className="text-3xl font-bold mb-6">
-        Welcome, <span className="text-green-400">{user?.username}</span>
-      </h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gray-800 rounded-2xl p-6 shadow-lg">
-          <h2 className="text-gray-400 text-sm">Rating</h2>
-          <p className="text-2xl font-bold text-green-400">{details?.rating}</p>
-        </div>
-        <div className="bg-gray-800 rounded-2xl p-6 shadow-lg">
-          <h2 className="text-gray-400 text-sm">Matches Played</h2>
-          <p className="text-2xl font-bold">{details?.matches_played}</p>
-        </div>
-        <div className="bg-gray-800 rounded-2xl p-6 shadow-lg">
-          <h2 className="text-gray-400 text-sm">Wins</h2>
-          <p className="text-2xl font-bold">{details?.wins}</p>
-        </div>
-      </div>
-      <div className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
-        <h2 className="text-xl font-semibold mb-4">Recent Matches</h2>
-        <ul className="space-y-2 text-gray-300 text-sm">
-          {matches.length !== 0 ? (
-            matches.map((match, index) => {
-              const player2_username =
-                match.player1_id === user.id
-                  ? match.Player2.username
-                  : match.Player1.username;
-              return match.winner === user.id ? (
-                <li key={index}>🟢 You won against {player2_username}</li>
-              ) : match.winner === null || match.winner === -1 ? (
-                <li key={index}>🟡 Match against {player2_username} was a draw</li>
+    <div className="min-h-screen bg-[#08090a]">
+      <TerminalHeader
+        user={user}
+        isAuthenticated={isAuthenticated}
+        loading={loading}
+        onLogout={logout}
+      />
+
+      <div className="relative">
+        <div className="absolute inset-0 bg-grid pointer-events-none h-48" />
+
+        <div className="relative max-w-4xl mx-auto px-4 py-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-7 h-7 rounded-[var(--radius-sm)] bg-surface-2 border border-[var(--border-default)] flex items-center justify-center">
+              <span className="text-[11px] font-mono text-accent">
+                ~
+              </span>
+            </div>
+            <div>
+              <h1 className="text-[15px] font-mono font-semibold text-zinc-100">
+                {user?.username}
+              </h1>
+              <SectionLabel>user dashboard</SectionLabel>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[var(--border-default)] rounded-lg overflow-hidden mb-8">
+            <Card hover={false} className="p-5 border-0 rounded-none">
+              <SectionLabel>rating</SectionLabel>
+              <p className="text-[22px] font-mono font-bold text-accent mt-1">
+                {details?.rating ?? "—"}
+              </p>
+            </Card>
+
+            <Card hover={false} className="p-5 border-0 rounded-none">
+              <SectionLabel>matches played</SectionLabel>
+              <p className="text-[22px] font-mono font-bold text-zinc-100 mt-1">
+                {details?.matches_played ?? "—"}
+              </p>
+            </Card>
+
+            <Card hover={false} className="p-5 border-0 rounded-none">
+              <SectionLabel>wins</SectionLabel>
+              <p className="text-[22px] font-mono font-bold text-zinc-100 mt-1">
+                {details?.wins ?? "—"}
+              </p>
+            </Card>
+          </div>
+
+          <div className="mb-8">
+            <SectionLabel className="mb-3 block">match history</SectionLabel>
+            <Card className="p-0 divide-y divide-[var(--border-default)] overflow-hidden">
+              {matches.length > 0 ? (
+                matches.map((match, index) => {
+                  const isPlayer1 = match.player1_id === user.id;
+                  const opponent = isPlayer1
+                    ? match.Player2?.username
+                    : match.Player1?.username;
+
+                  let status;
+                  if (match.winner === user.id) {
+                    status = { label: "win", dot: "online" };
+                  } else if (match.winner === null || match.winner === -1) {
+                    status = { label: "draw", dot: "away" };
+                  } else {
+                    status = { label: "loss", dot: "offline" };
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between px-4 py-2.5 text-[12px]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <StatusDot status={status.dot} />
+                        <span className="text-zinc-400">vs</span>
+                        <span className="text-zinc-200 font-medium">
+                          {opponent || "Unknown"}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[11px] font-mono ${
+                          status.label === "win"
+                            ? "text-accent"
+                            : status.label === "loss"
+                            ? "text-danger"
+                            : "text-warning"
+                        }`}
+                      >
+                        {status.label}
+                      </span>
+                    </div>
+                  );
+                })
               ) : (
-                <li key={index}>🔴 You lost to {player2_username}</li>
-              );
-            })
-          ) : (
-            <p>No matches played yet.</p>
-          )}
-        </ul>
+                <div className="px-4 py-6 text-center text-[12px] text-zinc-500">
+                  No matches played yet.
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <Button variant="ghost" size="xs" onClick={logout}>
+            &rarr; logout
+          </Button>
+        </div>
       </div>
-      <button
-        onClick={() => logout()}
-        className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-2 rounded-xl font-semibold text-black hover:opacity-90 transition-all duration-200 cursor-pointer"
-      >
-        Logout
-      </button>
     </div>
   );
 };

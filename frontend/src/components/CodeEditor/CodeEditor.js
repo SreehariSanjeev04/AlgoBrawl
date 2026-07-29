@@ -1,30 +1,31 @@
 "use client";
 
-import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-const Editor = dynamic(() => import("@monaco-editor/react"),  {ssr: false});
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 import { LANGUAGE_VERSIONS } from "@/constants/lang_constants";
 import { toast } from "sonner";
 import socket from "@/app/socket/socket";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import BOILERPLATE from "../../constants/boilerplate";
 import CodeTimer from "../CodeTimer/CodeTimer";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import { useSocketEditor } from "@/hooks/useSocketEditor";
+import SectionLabel from "@/components/ui/SectionLabel";
+import Button from "@/components/ui/Button";
 
 const CodeEditor = ({ roomId, problem }) => {
-  const BACKEND_URI = process.env.BACKEND_URI || "http://localhost:5000/api";
+  const BACKEND_URI = process.env.NEXT_PUBLIC_BACKEND_URI || "http://localhost:5000/api";
   const editorRef = useRef(null);
   const [language, setLanguage] = useState("python");
   const [value, setValue] = useState(BOILERPLATE[language] || "");
-  const [outputValue, setOutputValue] = useState("// Output will appear here");
+  const [outputValue, setOutputValue] = useState("// output will appear here");
   const [outputError, setOutputError] = useState(false);
   const [subLoading, setCodeLoading] = useState(false);
   const [testcase, setTestcase] = useState("");
   const [expected, setExpected] = useState("");
   const [input, setInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(Infinity); // 15 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(Infinity);
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
@@ -36,8 +37,6 @@ const CodeEditor = ({ roomId, problem }) => {
     editor.focus();
   };
 
-  // auto save the code every 10 seconds
-
   useAutoSave(`code_${roomId}_${user?.id}`, value);
 
   useEffect(() => {
@@ -47,23 +46,20 @@ const CodeEditor = ({ roomId, problem }) => {
   const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
-      console.log("Submitting code...");
       submitCode(false);
     }
     if ((e.ctrlKey || e.metaKey) && e.key === "e") {
       e.preventDefault();
-      console.log("Running code...");
       runCode();
     }
-  });
-
+  }, []);
 
   useEffect(() => {
-    if(loading) return;
-    if(!isAuthenticated && !loading) {
-      redirect("/login");
+    if (loading) return;
+    if (!isAuthenticated && !loading) {
+      router.replace("/login");
     }
-  }, [isAuthenticated, loading])
+  }, [isAuthenticated, loading]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -71,8 +67,7 @@ const CodeEditor = ({ roomId, problem }) => {
   }, [handleKeyDown]);
 
   useEffect(() => {
-    if (problem?.testcases.length) {
-      console.log(problem.testcases);
+    if (problem?.testcases?.length) {
       const inputStr = problem.testcases.map((t) => t.input).join("\n");
       let expectedStr = problem.testcases.map((t) => t.output).join("\n");
       expectedStr += "\n";
@@ -85,7 +80,6 @@ const CodeEditor = ({ roomId, problem }) => {
     setValue(BOILERPLATE[language] || "");
   }, [language]);
 
-  // retrieve saved code from localStorage on mount
   useEffect(() => {
     const savedCode = localStorage.getItem(`code_${roomId}_${user?.id}`);
     if (savedCode) {
@@ -94,27 +88,20 @@ const CodeEditor = ({ roomId, problem }) => {
   }, [roomId, user?.id]);
 
   useEffect(() => {
-  
-  })
-
-  useEffect(() => {
     socket.on("match-ended", ({ winner }) => {
-      console.log("Match ended, winner:", winner);
-      if(winner === user?.id) toast.success("Congratulations! You won the match!");
-      else toast.error("You lost the match. Better luck next time!");
-      setInterval(() => {
-        router.push("/dashboard");
-      }, 5000);
+      if (winner === user?.id) toast.success("You won the match!");
+      else toast.error("You lost. Better luck next time!");
+      setTimeout(() => router.push("/dashboard"), 5000);
     });
 
-    socket.on("time-up", () => { // socket when time is up
+    socket.on("time-up", () => {
       toast.error("Time's up! Auto-submitting your code.");
       submitCode(true);
-    })
+    });
 
     socket.on("match-time", ({ duration }) => {
       setTimeLeft(duration);
-    })
+    });
 
     socket.on("solution-feedback", (details) => {
       setOutputError(!details.passed);
@@ -122,18 +109,20 @@ const CodeEditor = ({ roomId, problem }) => {
     });
 
     socket.on("player-disconnected", ({ username }) => {
-      toast.error(`Player ${username} has disconnected. Match paused.`);
-    })
+      toast.error(`${username} disconnected. Match paused.`);
+    });
 
     socket.on("match-resumed", ({ username }) => {
-      toast.success(`Player ${username} has reconnected. Match resumed.`);
-    })
+      toast.success(`${username} reconnected. Match resumed.`);
+    });
 
     return () => {
       socket.off("match-ended");
-      socket.off("solution-feedback");
       socket.off("time-up");
+      socket.off("match-time");
       socket.off("solution-feedback");
+      socket.off("player-disconnected");
+      socket.off("match-resumed");
     };
   }, []);
 
@@ -147,19 +136,16 @@ const CodeEditor = ({ roomId, problem }) => {
       testcases: input,
       expected,
       isAuto,
-    }
+    };
     try {
       socket.emit("submit-solution", payload, (response) => {
         if (response.status === "ok") {
-          console.log("Submission received");
-          toast.success("Code submitted successfully!");
+          toast.success("Code submitted!");
         } else {
-          console.log("Submission error:", response.message);
-          toast.error(`Submission failed, try again!`);
+          toast.error("Submission failed, try again!");
         }
       });
     } catch (err) {
-      console.log(err);
       setOutputError(true);
       setOutputValue(err.message || "Could not connect to backend");
     } finally {
@@ -184,7 +170,6 @@ const CodeEditor = ({ roomId, problem }) => {
       });
 
       const data = await res.json();
-      console.log(data);
       setOutputError(!res.ok);
       setOutputValue(data.output || data.error || "No output");
     } catch {
@@ -196,109 +181,122 @@ const CodeEditor = ({ roomId, problem }) => {
   };
 
   return (
-    <div className="h-screen w-full bg-gray-900 text-white flex flex-col">
-      <div className="p-4 flex flex-wrap items-center gap-4 font-semibold bg-gray-800 shadow">
-        <div className="flex items-center gap-2">
-          <label htmlFor="language" className="text-sm text-gray-300">
-            Language:
-          </label>
-          <select
-            id="language"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 text-sm focus:ring focus:ring-blue-500"
-          >
-            {currentLanguages.map(([lang]) => (
-              <option key={lang} value={lang}>
-                {lang}
-              </option>
-            ))}
-          </select>
+    <div className="h-screen w-full bg-[#08090a] text-zinc-100 flex flex-col">
+      <div className="flex items-center justify-between h-11 px-4 border-b border-[var(--border-default)] bg-[#08090a]/80 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="language" className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+              lang
+            </label>
+            <select
+              id="language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-surface-1 text-zinc-300 border border-[var(--border-default)] rounded-[var(--radius-sm)] px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent/50 appearance-none cursor-pointer"
+            >
+              {currentLanguages.map(([lang]) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={runCode}
+              disabled={subLoading}
+            >
+              {subLoading ? "running..." : "run"}
+            </Button>
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={() => submitCode(false)}
+              disabled={subLoading}
+            >
+              {subLoading ? "submitting..." : "submit"}
+            </Button>
+          </div>
         </div>
 
-        <button
-          onClick={runCode}
-          disabled={subLoading}
-          onMouseOver={() => {}}
-          className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
-            subLoading ? "opacity-60 cursor-not-allowed" : ""
-          }`}
-        >
-          {subLoading ? "Running..." : "Run"}
-        </button>
-        <button
-          onClick={() => submitCode(false)}
-          disabled={subLoading}
-          className={`px-4 py-2 rounded-lg font-semibold text-black bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 transition-all duration-200 ${
-            subLoading ? "opacity-60 cursor-not-allowed" : ""
-          }`}
-        >
-          {subLoading ? "Submitting" : "Submit"}
-        </button>
         <CodeTimer duration={timeLeft} />
       </div>
 
-      <div className="flex-1 grid grid-cols-12 gap-4 p-4">
-        <div className="col-span-12 md:col-span-3 bg-gray-800 p-4 rounded-xl overflow-auto">
-          <h2 className="text-xl font-bold mb-2">
-            {problem?.title || "Problem Title"}
+      <div className="flex-1 flex flex-col lg:flex-row gap-px bg-[var(--border-default)] overflow-hidden">
+        <div className="lg:w-72 bg-surface-1 overflow-y-auto p-4 flex-shrink-0">
+          <h2 className="text-[13px] font-semibold text-zinc-200 mb-2">
+            {problem?.title || "Problem"}
           </h2>
-          <p className="text-sm text-gray-400 mb-4">
-            {problem?.description || "// Describe the problem here"}
+          <p className="text-[12px] text-zinc-500 leading-relaxed mb-4">
+            {problem?.description || "// Loading problem description..."}
           </p>
 
-          <div className="mt-6 bg-gray-700 p-3 rounded-xl">
-            <h3 className="text-md font-semibold mb-2 text-white">Testcases</h3>
+          <SectionLabel className="mb-2 block">test cases</SectionLabel>
+          <div className="space-y-2">
             {problem?.testcases?.length ? (
-              problem.testcases.slice(0, 3).map((testcase, idx) => (
+              problem.testcases.slice(0, 3).map((tc, idx) => (
                 <div
                   key={idx}
-                  className="mb-3 p-2 border border-gray-600 rounded bg-gray-800 text-sm text-gray-300"
+                  className="bg-black/40 border border-[var(--border-default)] rounded-[var(--radius-sm)] p-2.5"
                 >
-                  <p>
-                    <span className="text-gray-400">Input:</span>{" "}
-                    {testcase.input}
-                  </p>
-                  <p>
-                    <span className="text-gray-400">Expected:</span>{" "}
-                    {testcase.output}
-                  </p>
+                  <div className="text-[11px] font-mono text-zinc-500">
+                    <span className="text-zinc-600">input:</span> {tc.input}
+                  </div>
+                  <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
+                    <span className="text-zinc-600">expected:</span> {tc.output}
+                  </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-400">// Testcases will appear here</p>
+              <p className="text-[11px] font-mono text-zinc-600">{'// test cases will appear here'}</p>
             )}
           </div>
         </div>
 
-        <div className="col-span-12 md:col-span-6 bg-gray-800 rounded-xl overflow-hidden">
+        <div className="flex-1 bg-surface-1 overflow-hidden min-w-0">
           <Editor
-            theme="vs-dark"
+            theme="hc-black"
             height="100%"
             language={language}
             defaultValue={BOILERPLATE[language] || ""}
             value={value}
             onChange={(val) => setValue(val || "")}
             onMount={onMount}
+            options={{
+              fontSize: 13,
+              fontFamily: "var(--font-geist-mono), JetBrains Mono, monospace",
+              lineNumbers: "on",
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              padding: { top: 12 },
+              renderLineHighlight: "line",
+              cursorBlinking: "smooth",
+              cursorStyle: "line",
+              smoothScrolling: true,
+              bracketPairColorization: { enabled: true },
+            }}
           />
         </div>
 
-        <div className="col-span-12 md:col-span-3 flex flex-col gap-2">
-          <div className="bg-gray-800 p-4 rounded-xl h-1/2 overflow-auto">
-            <h2 className="text-lg font-semibold mb-2">Output</h2>
+        <div className="lg:w-72 bg-surface-1 flex flex-col flex-shrink-0">
+          <div className="flex-1 p-4 border-b border-[var(--border-default)] overflow-y-auto">
+            <SectionLabel className="mb-2 block">output</SectionLabel>
             <pre
-              className={`text-sm whitespace-pre-wrap ${
-                outputError ? "text-red-500" : "text-green-400"
+              className={`text-[12px] font-mono whitespace-pre-wrap ${
+                outputError ? "text-danger" : "text-accent"
               }`}
             >
               {outputValue}
             </pre>
           </div>
 
-          <div className="bg-gray-800 p-4 rounded-xl h-1/2">
-            <h2 className="text-lg font-semibold mb-2">Custom Testcase</h2>
+          <div className="p-4">
+            <SectionLabel className="mb-2 block">custom input</SectionLabel>
             <textarea
-              className="w-full h-64 bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              className="w-full h-24 bg-black/40 text-zinc-300 border border-[var(--border-default)] rounded-[var(--radius-sm)] p-2.5 text-[11px] font-mono focus:outline-none focus:border-accent/50 resize-none"
               placeholder="Enter test case input here..."
               value={testcase}
               onChange={(e) => setTestcase(e.target.value)}

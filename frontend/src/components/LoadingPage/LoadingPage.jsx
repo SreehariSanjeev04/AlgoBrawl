@@ -1,17 +1,22 @@
 "use client";
 
 import React from "react";
-import { MoonLoader } from "react-spinners"; 
 
 const LoadingScreen = () => {
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      <div className="flex flex-col items-center gap-6 animate-fadeIn">
-        <MoonLoader color="#a855f7" size={60} />
-        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500">
-          Loading AlgoBrawl...
-        </h1>
-        <p className="text-sm text-gray-400">Preparing your battle arena...</p>
+    <div className="min-h-screen bg-[#08090a] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 rounded-[var(--radius-sm)] bg-surface-1 border border-[var(--border-default)] flex items-center justify-center">
+          <div className="w-5 h-5 border border-accent/30 border-t-accent rounded-full animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="text-[12px] font-mono text-zinc-100 font-medium">
+            algobrawl
+          </p>
+          <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
+            Initializing...
+          </p>
+        </div>
       </div>
     </div>
   );

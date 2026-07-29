@@ -1,10 +1,15 @@
 import React from 'react'
+import SectionLabel from '@/components/ui/SectionLabel'
+import Card from '@/components/ui/Card'
 
 const FriendsComponent = () => {
   return (
-    <div className='w-56 h-96 overflow-scroll'>
-        <h1 className='font-semibold text-lg font-black'>Friends Online</h1>
-    </div>
+    <Card className="w-56 overflow-y-auto" hover={false}>
+      <div className="p-3">
+        <SectionLabel>friends online</SectionLabel>
+        <p className="text-[11px] text-zinc-600 mt-2">No friends online</p>
+      </div>
+    </Card>
   )
 }
 
