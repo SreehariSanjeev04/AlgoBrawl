@@ -20,8 +20,13 @@ initializeSocket(io);
 
 const start = async () => {
   try {
-    await sequelize.sync({ alter: true });
-    console.log("Database synced");
+    if (env.nodeEnv === "development") {
+      await sequelize.sync({ alter: true });
+      console.log("Database synced (dev mode - alter)");
+    } else {
+      await sequelize.sync();
+      console.log("Database synced (production)");
+    }
 
     httpServer.listen(env.port, () => {
       console.log(`Server listening to PORT ${env.port}`);

@@ -32,28 +32,23 @@ const initializeSocket = (io) => {
       bucketQueue.enqueue(user.rating, user.id, socket.id);
       console.log("Bucket Queue Size:", bucketQueue.size());
 
-      if (bucketQueue.hasAtleastTwoPlayers()) {
-        console.log("Attempting to find match...");
-        const player1 = bucketQueue.dequeueNextPlayer();
-        const player2 = player1 !== null
-          ? bucketQueue.findOpponentNode(player1.rating)
-          : null;
+      const pair = bucketQueue.tryMatch();
+      if (!pair) return;
 
-        if (player1 !== null && player2 !== null) {
-          console.log("Found two players:", player1, player2);
-          const roomId = crypto.randomUUID();
+      console.log("Found two players:", pair.p1, pair.p2);
+      const roomId = crypto.randomUUID();
 
-          const matchResult = await createMatch(
-            roomId, player1, player2, "Easy", io, MatchManager.activeMatches
-          );
+      const matchResult = await createMatch(
+        roomId, pair.p1, pair.p2, "Easy", io, MatchManager.activeMatches
+      );
 
-          if (!matchResult.success) {
-            console.error("Match creation failed:", matchResult.error);
-          } else {
-            console.log("Match created with Room ID:", roomId);
-            transmitTime(io, roomId, MatchManager.activeMatches);
-          }
-        }
+      if (!matchResult.success) {
+        console.error("Match creation failed:", matchResult.error);
+        bucketQueue.enqueue(pair.p1.rating, pair.p1.id, pair.p1.socketId);
+        bucketQueue.enqueue(pair.p2.rating, pair.p2.id, pair.p2.socketId);
+      } else {
+        console.log("Match created with Room ID:", roomId);
+        transmitTime(io, roomId, MatchManager.activeMatches);
       }
     });
 

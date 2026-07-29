@@ -88,7 +88,9 @@ class MatchManager {
    */
 
   updateSocketId(roomId, userId, socketId) {
-    this.activeMatches.get(roomId).players[userId] = socketId;
+    const match = this.activeMatches.get(roomId);
+    if (!match) return;
+    match.players[userId] = socketId;
   }
 }
 

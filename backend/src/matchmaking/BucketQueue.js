@@ -1,4 +1,5 @@
 import Queue from "./Queue.js";
+
 class BucketQueue {
   constructor(start, end) {
     this.start = start;
@@ -11,43 +12,38 @@ class BucketQueue {
 
   enqueue(rating, userId, socketId) {
     const modUserId = String(userId);
-    if (this.nodeMap.has(modUserId)) {
-      return;
-    }
+    if (this.nodeMap.has(modUserId)) return;
     const bucketIndex = rating - this.start;
     const node = this.buckets[bucketIndex].enqueue(userId, rating, socketId);
     this.nodeMap.set(modUserId, node);
     this.currentSize++;
-    console.log(this.nodeMap);
   }
-  
+
   size() {
     return this.currentSize;
   }
 
-  dequeueNextPlayer() {
-    let checked = 0;
-    while (checked <= this.end - this.start) {
-      const bucketIndex = this.currentBucket - this.start;
-      const node = this.buckets[bucketIndex].dequeue();
-      this.currentBucket =
-        this.currentBucket < this.end ? this.currentBucket + 1 : this.start;
-
-      if (node) {
-        this.nodeMap.delete(node.id);
-        this.currentSize--;
-        return node;
+  tryMatch() {
+    if (this.currentSize < 2) return null;
+    const entries = Array.from(this.nodeMap.values());
+    entries.sort((a, b) => a.rating - b.rating);
+    for (let i = 0; i < entries.length - 1; i++) {
+      const limit = entries[i].rating + 200;
+      for (let j = i + 1; j < entries.length && entries[j].rating <= limit; j++) {
+        const p1 = entries[i];
+        const p2 = entries[j];
+        this.nodeMap.delete(String(p1.id));
+        this.nodeMap.delete(String(p2.id));
+        this.currentSize -= 2;
+        return { p1, p2 };
       }
-      checked++;
     }
     return null;
   }
 
   remove(userId) {
     const modUserId = String(userId);
-    if (!this.nodeMap.has(modUserId)) {
-      return false;
-    }
+    if (!this.nodeMap.has(modUserId)) return false;
     const node = this.nodeMap.get(modUserId);
     const bucketIndex = node.rating - this.start;
     this.buckets[bucketIndex].remove(node);
@@ -56,34 +52,9 @@ class BucketQueue {
     return true;
   }
 
-  findOpponentNode(rating) {
-    for (let i = 0; i <= 100; i++) {
-      const lower =
-        rating - i >= this.start
-          ? this.buckets[rating - i - this.start].front
-          : null;
-      if (lower) {
-        const node = this.buckets[rating - i - this.start].dequeue();
-        this.nodeMap.delete(node.id);
-        this.currentSize--;
-        return node;
-      }
-
-      const higher =
-        rating + i <= this.end
-          ? this.buckets[rating + i - this.start].front
-          : null;
-      if (higher) {
-        const node = this.buckets[rating + i - this.start].dequeue();
-        this.nodeMap.delete(node.id);
-        return node;
-      }
-    }
-    return null;
-  }
   hasAtleastTwoPlayers() {
     return this.nodeMap.size >= 2;
   }
 }
-export default BucketQueue;
 
+export default BucketQueue;

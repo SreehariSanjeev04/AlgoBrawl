@@ -3,11 +3,12 @@ import jwt from "jsonwebtoken";
 import { Op } from "sequelize";
 import { env } from "../config/env.js";
 import { User, Match } from "../database/associations.js";
+import { AppError } from "../middleware/error.middleware.js";
 
 const COOKIE_OPTIONS = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
   httpOnly: true,
-  sameSite: "lax",
+  sameSite: "strict",
   secure: env.nodeEnv === "production",
 };
 
@@ -15,7 +16,7 @@ export const userService = {
   async register(username, password) {
     const existing = await User.findOne({ where: { username } });
     if (existing) {
-      throw Object.assign(new Error("User already exists"), { statusCode: 400 });
+      throw new AppError("User already exists", 400);
     }
     const salt = await genSalt(10);
     const hashedPassword = await hash(password, salt);
@@ -24,15 +25,15 @@ export const userService = {
 
   async login(username, password) {
     if (!username || !password) {
-      throw Object.assign(new Error("Please fill all the details"), { statusCode: 400 });
+      throw new AppError("Please fill all the details", 400);
     }
     const user = await User.findOne({ where: { username } });
     if (!user) {
-      throw Object.assign(new Error("User does not exist"), { statusCode: 400 });
+      throw new AppError("User does not exist", 400);
     }
     const isValid = await compare(password, user.password);
     if (!isValid) {
-      throw Object.assign(new Error("Invalid credentials"), { statusCode: 401 });
+      throw new AppError("Invalid credentials", 401);
     }
 
     const payload = { username, id: user.id, rating: user.rating };
@@ -58,7 +59,7 @@ export const userService = {
   async updateStats(id, rating, matchesPlayed, wins) {
     const user = await User.findByPk(id);
     if (!user) {
-      throw Object.assign(new Error("User not found"), { statusCode: 404 });
+      throw new AppError("User not found", 404);
     }
     user.rating = rating;
     user.matches_played = matchesPlayed;
@@ -69,7 +70,7 @@ export const userService = {
   async updateScore(userId, newScore) {
     const user = await User.findByPk(userId);
     if (!user) {
-      throw Object.assign(new Error("User not found"), { statusCode: 404 });
+      throw new AppError("User not found", 404);
     }
     user.rating = newScore;
     return user.save();
@@ -101,7 +102,7 @@ export const userService = {
     return new Promise((resolve, reject) => {
       jwt.verify(refreshToken, env.refreshTokenSecret, (err, payload) => {
         if (err) {
-          return reject(Object.assign(new Error("Kindly login again"), { statusCode: 401 }));
+          return reject(new AppError("Kindly login again", 401));
         }
         const newAccessToken = jwt.sign(
           { id: payload.id, username: payload.username, rating: payload.rating },

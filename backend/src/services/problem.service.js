@@ -1,3 +1,4 @@
+import { Sequelize } from "sequelize";
 import Problem from "../models/Problem.js";
 
 export const problemService = {
@@ -6,13 +7,11 @@ export const problemService = {
   },
 
   async findByDifficulty(difficulty = "Easy") {
-    const problems = await Problem.findAll({
+    const problem = await Problem.findOne({
       where: { difficulty },
-      limit: 50,
+      order: Sequelize.literal("RANDOM()"),
     });
-    if (problems.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * problems.length);
-    return problems[randomIndex];
+    return problem || null;
   },
 
   async create(data) {

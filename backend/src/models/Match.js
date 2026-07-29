@@ -18,10 +18,12 @@ const Match = sequelize.define("Match", {
   player1_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    index: true,
   },
   player2_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    index: true,
   },
   winner: {
     type: DataTypes.INTEGER,

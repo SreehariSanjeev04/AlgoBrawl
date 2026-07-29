@@ -4,16 +4,17 @@ import sequelize from "../config/database.js";
 const Submission = sequelize.define("Submission", {
   id: {
     type: DataTypes.INTEGER,
-    unique: true,
     autoIncrement: true,
     primaryKey: true,
   },
   user_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    index: true,
   },
   match_id: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   code: {
     type: DataTypes.TEXT,

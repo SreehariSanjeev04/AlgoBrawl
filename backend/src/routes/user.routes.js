@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { userController } from "../controllers/user.controller.js";
+import auth from "../middleware/auth.middleware.js";
 import internalAuth from "../middleware/internal-auth.middleware.js";
 
 const router = Router();
@@ -11,7 +12,7 @@ router.get("/:id", userController.getById);
 router.post("/validate", userController.validate);
 router.post("/refresh-token", userController.refreshToken);
 router.post("/get-matches", userController.getMatches);
-router.patch("/update", userController.update);
+router.patch("/update", auth, userController.update);
 router.put("/update-score", internalAuth, userController.updateScore);
 
 export default router;

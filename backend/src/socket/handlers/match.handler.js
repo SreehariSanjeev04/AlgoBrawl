@@ -1,4 +1,7 @@
-import { MatchAPI, ProblemAPI, UserAPI } from "../../services/api.service.js";
+import Match from "../../models/Match.js";
+import User from "../../models/User.js";
+import sequelize from "../../config/database.js";
+import { MatchAPI, ProblemAPI } from "../../services/api.service.js";
 import { calculateNewRatings } from "../../services/elo.service.js";
 import MatchManager from "../../managers/MatchManager.js";
 import ActiveUserManager from "../../managers/ActiveUserManager.js";
@@ -71,45 +74,45 @@ export const transmitTime = (io, roomId, activeMatches) => {
   }, 1000);
 };
 
-const storeMatch = async (roomId, problemId, player1Id, player2Id, winner) => {
-  try {
-    await MatchAPI.storeMatch(roomId, problemId, player1Id, player2Id, winner);
-  } catch (error) {
-    console.error(`[MatchHandler.storeMatch] Error storing match in room ${roomId}:`, error instanceof Error ? error.message : String(error));
-  }
-};
-
 export const finalizeMatchEloAndStore = async (roomId, match, winner, isDraw) => {
   const [p1, p2] = Object.keys(match.players).map(Number);
 
   try {
-    if (isDraw) {
-      const { p1New, p2New } = calculateNewRatings(match.ratings[p1], match.ratings[p2], "draw");
-      const detailsP1 = await UserAPI.fetch(p1);
-      const detailsP2 = await UserAPI.fetch(p2);
+    await sequelize.transaction(async (tx) => {
+      const { p1New, p2New } = isDraw
+        ? calculateNewRatings(match.ratings[p1], match.ratings[p2], "draw")
+        : calculateNewRatings(match.ratings[p1], match.ratings[p2], winner === p1 ? "p1" : "p2");
 
-      if (detailsP1) {
-        await UserAPI.update(p1, p1New, detailsP1.matches_played + 1, detailsP1.wins);
-      }
-      if (detailsP2) {
-        await UserAPI.update(p2, p2New, detailsP2.matches_played + 1, detailsP2.wins);
-      }
-    } else {
-      const loser = winner === p1 ? p2 : p1;
-      await storeMatch(roomId, match.problemId, p1, p2, winner);
-      const { p1New, p2New } = calculateNewRatings(
-        match.ratings[p1], match.ratings[p2], winner === p1 ? "p1" : "p2"
-      );
-      const detailsP1 = await UserAPI.fetch(p1);
-      const detailsP2 = await UserAPI.fetch(p2);
+      const [p1User, p2User] = await Promise.all([
+        User.findByPk(p1, { transaction: tx, attributes: ["id", "matches_played", "wins"] }),
+        User.findByPk(p2, { transaction: tx, attributes: ["id", "matches_played", "wins"] }),
+      ]);
 
-      if (detailsP1) {
-        await UserAPI.update(p1, p1New, detailsP1.matches_played + 1, winner === p1 ? detailsP1.wins + 1 : detailsP1.wins);
+      if (!p1User || !p2User) {
+        throw new Error("User not found during finalizeMatchEloAndStore");
       }
-      if (detailsP2) {
-        await UserAPI.update(p2, p2New, detailsP2.matches_played + 1, winner === p2 ? detailsP2.wins + 1 : detailsP2.wins);
+
+      const p1Wins = winner === p1 ? (isDraw ? 0 : 1) : 0;
+      const p2Wins = winner === p2 ? (isDraw ? 0 : 1) : 0;
+
+      await Promise.all([
+        User.update(
+          { rating: p1New, matches_played: p1User.matches_played + 1, wins: p1User.wins + p1Wins },
+          { where: { id: p1 }, transaction: tx }
+        ),
+        User.update(
+          { rating: p2New, matches_played: p2User.matches_played + 1, wins: p2User.wins + p2Wins },
+          { where: { id: p2 }, transaction: tx }
+        ),
+      ]);
+
+      if (!isDraw) {
+        await Match.create({
+          room_id: roomId, problem_id: match.problemId,
+          player1_id: p1, player2_id: p2, winner,
+        }, { transaction: tx });
       }
-    }
+    });
   } catch (error) {
     console.error("Error finalizing match Elo and storing:", error instanceof Error ? error.message : String(error));
   }
