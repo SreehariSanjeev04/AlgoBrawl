@@ -161,6 +161,7 @@ const CodeEditor = ({ roomId, problem }) => {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access-token")}`,
         },
         body: JSON.stringify({
           language,

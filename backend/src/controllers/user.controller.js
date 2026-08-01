@@ -69,8 +69,9 @@ export const userController = {
 
   async getMatches(req, res, next) {
     try {
-      const { user_id } = req.body;
-      const matches = await userService.getMatches(user_id);
+      const userId = Number(req.user?.id);
+      if (!Number.isInteger(userId)) throw new AppError("Unauthorized", 401);
+      const matches = await userService.getMatches(userId);
       res.status(200).json({ matches });
     } catch (err) {
       next(err);
@@ -85,6 +86,9 @@ export const userController = {
       }
       if (typeof id !== "number" || typeof rating !== "number" || typeof matches_played !== "number" || typeof wins !== "number") {
         throw new AppError("Invalid user details", 400);
+      }
+      if (Number(req.user?.id) !== id) {
+        throw new AppError("You can only update your own profile", 403);
       }
       const user = await userService.updateStats(id, rating, matches_played, wins);
       res.status(200).json({ message: "User updated successfully", user });

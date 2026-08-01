@@ -67,9 +67,9 @@ export const MatchAPI = {
 };
 
 export const SubmissionAPI = {
-  submitCode: async (language, code, testcases, expected) => {
+  submitCode: async (language, code, testcases, expected, judgeType = "string") => {
     try {
-      const res = await api.post("/submit", { language, code, testcases, expected });
+      const res = await api.post("/submit", { language, code, testcases, expected, judge_type: judgeType });
       return res.data;
     } catch (error) {
       console.error(`[SubmissionAPI.submitCode] Error submitting code:`, error instanceof Error ? error.message : String(error));

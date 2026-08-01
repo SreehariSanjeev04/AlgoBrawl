@@ -15,7 +15,7 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET,
   refreshTokenSecret: process.env.REFRESH_TOKEN,
   internalSecret: process.env.INTERNAL_SECRET,
-  maxContainers: Number(process.env.MAX_CONTAINERS) || 5,
+  maxContainers: Number(process.env.MAX_CONTAINERS) || Number(process.env.MAX_CONTAINAERS) || 5,
   db: {
     host: process.env.DB_HOST || "127.0.0.1",
     name: process.env.DB_NAME || "Algobrawl",

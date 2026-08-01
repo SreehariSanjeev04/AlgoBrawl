@@ -27,7 +27,7 @@ export const userService = {
     if (!username || !password) {
       throw new AppError("Please fill all the details", 400);
     }
-    const user = await User.findOne({ where: { username } });
+    const user = await User.unscoped().findOne({ where: { username } });
     if (!user) {
       throw new AppError("User does not exist", 400);
     }

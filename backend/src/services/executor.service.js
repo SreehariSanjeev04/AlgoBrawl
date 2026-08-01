@@ -31,14 +31,15 @@ const releaseContainer = () => {
   if (activeContainers > 0) activeContainers--;
 };
 
-const runDocker = async (language, filepath, inputpath, extraMounts = []) => {
+const runDocker = async (language, filepath, inputpath, extraMounts = [], extraEnv = []) => {
   const config = LANGUAGE_CONFIG[language];
   const mountArgs = [
     `-v "${filepath}:/code/${config.file}"`,
     `-v "${inputpath}:/code/input.txt"`,
     ...extraMounts,
   ].join(" ");
-  const cmd = `timeout -k 5s 5s docker run --rm --memory=100m --cpus=0.5 ${mountArgs} ${config.image}`;
+  const envArgs = extraEnv.map((entry) => `-e ${entry}`).join(" ");
+  const cmd = `timeout -k 5s 5s docker run --rm --memory=100m --cpus=0.5 ${envArgs} ${mountArgs} ${config.image}`;
   try {
     const { stdout } = await exec(cmd);
     return { output: stdout, status: 200 };
@@ -81,7 +82,7 @@ export const executorService = {
     }
   },
 
-  async submitCode(language, code, testcases, expected) {
+  async submitCode(language, code, testcases, expected, judgeType = "string") {
     const config = LANGUAGE_CONFIG[language];
     if (!config) return { output: "Unsupported language", passed: false, status: 400 };
 
@@ -103,7 +104,7 @@ export const executorService = {
       const result = await runDocker(language, filepath, testcasePath, [
         `-v "${expectedPath}:/code/expected.txt"`,
         "--network=none",
-      ]);
+      ], [`JUDGE_TYPE=${judgeType}`]);
       const passed = result.status === 200;
       return { output: result.output, passed, status: passed ? 200 : 400 };
     } catch (err) {

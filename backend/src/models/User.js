@@ -31,6 +31,15 @@ const User = sequelize.define("User", {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+}, {
+  defaultScope: {
+    attributes: { exclude: ["password"] },
+  },
+  toJSON() {
+    const values = { ...this.get() };
+    delete values.password;
+    return values;
+  },
 });
 
 export default User;

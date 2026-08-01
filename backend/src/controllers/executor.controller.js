@@ -14,8 +14,8 @@ export const executorController = {
 
   async submit(req, res, next) {
     try {
-      const { language, code, testcases, expected } = req.body;
-      const result = await executorService.submitCode(language, code, testcases, expected);
+      const { language, code, testcases, expected, judge_type } = req.body;
+      const result = await executorService.submitCode(language, code, testcases, expected, judge_type);
       const { status, ...body } = result;
       res.status(result.status).json(body);
     } catch (err) {

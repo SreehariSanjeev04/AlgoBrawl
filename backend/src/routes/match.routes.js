@@ -5,7 +5,7 @@ import internalAuth from "../middleware/internal-auth.middleware.js";
 
 const router = Router();
 
-router.post("/create-match", matchController.createRoom);
+router.post("/create-match", internalAuth, matchController.createRoom);
 router.get("/:matchId", matchController.getRoom);
 router.delete("/:matchId", auth, matchController.removeRoom);
 router.post("/store-match", internalAuth, matchController.storeMatch);
