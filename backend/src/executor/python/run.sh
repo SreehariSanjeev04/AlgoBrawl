@@ -1,20 +1,24 @@
 #!/bin/bash
-python3 main.py < input.txt > output.txt
+set -o pipefail
+JUDGE_TYPE="${JUDGE_TYPE:-string}"
 
-# Normalize the output by trimming whitespace and sorting lines
-python3 normalizer.py output.txt > normalized_output.txt
-mv normalized_output.txt output.txt
-echo "Output: "
-cat output.txt
+if ! timeout 4s python3 main.py < input.txt > output_raw.txt 2> error.txt; then
+  echo "--- RUNTIME ERROR ---"
+  cat error.txt
+  echo "VERDICT:ERROR"
+  exit 1
+fi
+
+bash /code/normalizer.sh output_raw.txt output.txt "$JUDGE_TYPE"
+
 if [[ -e expected.txt ]]; then
-    cmp --silent output.txt expected.txt
-    STATUS=$?
-
-    if [[ $STATUS -eq 0 ]]; then
-        echo "Approved"
-    else
-        echo "Not Approved"
-    fi
+  bash /code/normalizer.sh expected.txt expected_norm.txt "$JUDGE_TYPE"
+  if cmp -s output.txt expected_norm.txt; then
+    echo "VERDICT:APPROVED"
+  else
+    echo "VERDICT:NOT_APPROVED"
+  fi
 else
-    cat output.txt
+  echo "Output:"
+  cat output.txt
 fi

@@ -1,6 +1,6 @@
-FROM python:3.11-slim 
-RUN apt-get update && apt-get install time
+FROM python:3.11-slim
 WORKDIR /code
+RUN chmod 777 /code
 COPY run.sh .
 RUN chmod +x run.sh
-CMD ["tail",  "-f", "/dev/null"]
+CMD ["bash", "run.sh"]
