@@ -56,22 +56,27 @@ export const handleUserDisconnection = (io, userId) => {
   }
 
   PendingConnections.set(userId, {
-    timeout: setTimeout(() => {
+    timeout: setTimeout(async () => {
       console.log(`Removing user ${userId} after grace period`);
       const roomId = ActiveUserManager.get(userId)?.room_id;
       if (roomId) {
         const match = MatchManager.get(roomId);
-        if (match) {
+        if (match && !match.finalized) {
           const winnerId = Object.keys(match.players).find(
             (id) => userId !== parseInt(id)
           );
-          console.log("Match: ", match);
-          console.log("WinnerId: ", winnerId);
           if (winnerId && !match.winner) {
+            match.finalized = true;
             match.winner = parseInt(winnerId);
-            finalizeMatchEloAndStore(roomId, match, parseInt(winnerId), false);
-            MatchManager.endMatch(roomId);
-            io.to(roomId).emit("match-ended", { winner: parseInt(winnerId) });
+            try {
+              await finalizeMatchEloAndStore(roomId, match, parseInt(winnerId), false);
+              MatchManager.endMatch(roomId);
+              io.to(roomId).emit("match-ended", { winner: parseInt(winnerId) });
+            } catch (error) {
+              match.finalized = false;
+              console.error("Failed to finalize match after disconnect:", error instanceof Error ? error.message : String(error));
+              io.to(roomId).emit("match-error", { message: "Failed to finalize match. Please try again." });
+            }
           } else {
             MatchManager.endMatch(roomId);
             if (match.winner) {
@@ -89,12 +94,10 @@ export const handleUserDisconnection = (io, userId) => {
 export const pauseMatchOnDisconnect = (userId) => {
   const userData = ActiveUserManager.get(userId);
   const roomId = userData?.room_id;
-  console.log(`Pausing match timer for user ${userId} in room ${roomId}`);
   if (roomId) {
     const match = MatchManager.get(roomId);
     if (match && match.timer) {
       MatchManager.stopTimer(roomId);
-      console.log(`Paused timer for room ${roomId} due to player disconnect`);
-    } else console.log(`No active timer to pause for room ${roomId}`);
+    }
   }
 };

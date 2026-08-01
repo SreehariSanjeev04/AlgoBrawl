@@ -156,9 +156,16 @@ const initializeSocket = (io) => {
 
         const opponent = Object.keys(match.players).map(Number).find((u) => u !== userId);
         if (!opponent) {
-          io.to(roomId).emit("match-ended", { winner: userId });
-          finalizeMatchEloAndStore(roomId, match, userId, false);
-          MatchManager.endMatch(roomId);
+          match.finalized = true;
+          try {
+            await finalizeMatchEloAndStore(roomId, match, userId, false);
+            io.to(roomId).emit("match-ended", { winner: userId });
+            MatchManager.endMatch(roomId);
+          } catch (error) {
+            match.finalized = false;
+            console.error("[Code Submission] Finalize error:", error instanceof Error ? error.message : String(error));
+            socket.emit("solution-feedback", { passed: false, message: "Server error while finalizing. Please try again." });
+          }
           return;
         }
 
@@ -189,9 +196,17 @@ const initializeSocket = (io) => {
         }
 
         if (shouldMatchEnd) {
-          await finalizeMatchEloAndStore(roomId, match, finalWinner, isDraw);
-          io.to(roomId).emit("match-ended", { winner: finalWinner, isDraw });
-          MatchManager.endMatch(roomId);
+          match.finalized = true;
+          try {
+            await finalizeMatchEloAndStore(roomId, match, finalWinner, isDraw);
+            io.to(roomId).emit("match-ended", { winner: finalWinner, isDraw });
+            MatchManager.endMatch(roomId);
+          } catch (error) {
+            match.finalized = false;
+            match.submitted[userId] = false;
+            console.error("[Code Submission] Finalize error:", error instanceof Error ? error.message : String(error));
+            socket.emit("solution-feedback", { passed: false, message: "Server error while finalizing. Please try again." });
+          }
         }
       } catch (error) {
         console.error("[Code Submission] Submission error:", error instanceof Error ? error.message : String(error));
@@ -202,6 +217,9 @@ const initializeSocket = (io) => {
 
     socket.on("disconnect", () => {
       const userId = socket.user_id;
+      if (userId) {
+        bucketQueue.remove(userId);
+      }
       handleUserDisconnection(io, userId);
       pauseMatchOnDisconnect(userId);
     });

@@ -45,21 +45,6 @@ class MatchManager {
    * @returns {void}
    */
 
-  startTimer(io, roomId) {
-    const match = this.activeMatches.get(roomId);
-    if (!match) return;
-
-    match.timer = setInterval(() => {
-      if (match.duration > 0) {
-        match.duration--;
-        io.to(roomId).emit("match-time", { duration: match.duration });
-      } else {
-        this.stopTimer(roomId);
-        io.to(roomId).emit("time-up");
-      }
-    }, 1000);
-  }
-
   /**
    * 
    * @param {string} roomId 

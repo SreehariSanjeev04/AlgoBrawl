@@ -1,6 +1,5 @@
 import Match from "../models/Match.js";
-
-const Matches = new Map();
+import MatchManager from "../managers/MatchManager.js";
 
 export const matchController = {
   createRoom(req, res, next) {
@@ -9,8 +8,22 @@ export const matchController = {
       if (!roomId || !players || !(players instanceof Array) || !problem) {
         return res.status(400).json({ error: "Incomplete details to create a room" });
       }
-      Matches.set(roomId, { players, problem });
-      res.status(200).json({ message: "Room Created", room: Matches.get(roomId) });
+      const playerMap = {};
+      for (const playerId of players) {
+        playerMap[playerId] = null;
+      }
+      MatchManager.set(roomId, {
+        players: playerMap,
+        problemId: problem.id,
+        winner: null,
+        finalized: false,
+        submitted: {},
+        isAutoSubmit: {},
+        approved: {},
+        duration: 15 * 60,
+        timer: null,
+      });
+      res.status(200).json({ message: "Room Created", room: MatchManager.get(roomId) });
     } catch (err) {
       next(err);
     }
@@ -18,18 +31,18 @@ export const matchController = {
 
   getRoom(req, res) {
     const { matchId } = req.params;
-    if (!matchId || !Matches.get(matchId)) {
+    if (!matchId || !MatchManager.get(matchId)) {
       return res.status(400).json({ error: "Invalid match id" });
     }
-    res.status(200).json({ room: Matches.get(matchId) });
+    res.status(200).json({ room: MatchManager.get(matchId) });
   },
 
   removeRoom(req, res) {
     const { matchId } = req.params;
-    if (!matchId || !Matches.get(matchId)) {
+    if (!matchId || !MatchManager.get(matchId)) {
       return res.status(400).json({ error: "Invalid match id" });
     }
-    Matches.delete(matchId);
+    MatchManager.endMatch(matchId);
     res.status(200).json({ message: "Match removed successfully" });
   },
 
